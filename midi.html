@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+    <div id = "outer">
+        <div id = "quiz">
+            <div id = "buttons">
+                <div id = "game_choices">
+                </div>
+                <div id = "option_buttons">
+                    <button id = "options_toggle">*</button>
+                    <button id = "color_button">~</button>
+                </div>
+            </div>
+            <div id = choices style="display: none">
+                <div class="choice_holder">
+                    <div class="selection_title">intervals</div>
+                    <div id = "interval_types" class="selection"></div>
+                </div>
+                <div class="choice_holder">
+                    <div class="selection_title">chords</div>
+                    <div id = "chord_types" class="selection"></div>
+                </div>
+                <div class="choice_holder">
+                    <div class="selection_title">scales</div>
+                    <div id = "scale_types" class="selection"></div>
+                </div>
+            </div>
+            <pre id = "terminal">█</pre>
+            <canvas id	= "visuals" style="display: none"></canvas><br>
+        </div>
+        <div id = "keyboard">
+            <div id = "black_keys">
+                <div class="clear"></div>
+                <div id = "1"   class= "black"></div>
+                <div class="clear"></div>
+                <div id = "3"   class= "black"></div>
+                <div class="clear"></div>
+                <div class="clear"></div>
+                <div id = "6"   class= "black"></div>
+                <div class="clear"></div>
+                <div id = "8"   class= "black"></div>
+                <div class="clear"></div>
+                <div id = "10"  class= "black"></div>
+                <div class="clear"></div>
+            </div>
+            <div id = "white_keys">
+                <div id = "0"   class= "white"></div>
+                <div id = "2"   class= "white"></div>
+                <div id = "4"   class= "white"></div>
+                <div id = "5"   class= "white"></div>
+                <div id = "7"   class= "white"></div>
+                <div id = "9"   class= "white"></div>
+                <div id = "11"  class= "white"></div>
+            </div>
+        </div>
+        
+    </div>
+    <script src = "utility.js"      ></script>
+    <script src = "canvas.js"       ></script>
+    <script src = "draw.js"         ></script>
+    <script src = "midi.js"         ></script>
+    <script src = "terminal.js"     ></script>
+    <script src = "theory.js"       ></script>
+    <script src = "note_quiz.js"    ></script>
+    <script src = "chord_quiz.js"   ></script>
+    <script src = "interval_quiz.js"></script>
+    <script src = "scale_quiz.js"   ></script>
+
+
+    <script>
+        const toggleButton = document.getElementById('options_toggle');
+        const contentDiv = document.getElementById('choices');
+
+        toggleButton.addEventListener('click', () => {
+            contentDiv.style.display = contentDiv.style.display === 'none' ? 'flex' : 'none';
+        });
+
+        // this next code can check and change the color properties of the page
+        // const colorButton = document.getElementById('color_button')
+        // colorButton.addEventListener('click', () => {
+        //     document.documentElement.style.setProperty('--bg_color', '#321');
+        //     console.log(document.documentElement.style.getPropertyValue('--bg_color'));
+        // });
+
+    </script>
+
+</body>
+
+</html>

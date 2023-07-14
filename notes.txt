@@ -1,0 +1,17 @@
+important to know that the callbacks also get keyup signals!
+
+when switching between activities, the active one should be able to clean up after itself, 
+clearing intervals and such 
+
+if you get it right, it should hold until the key up event, the chord should light up green on the keyboard
+
+also make it so that the same structure doesn't show up twice in a row
+
+figure out how to locally save user settings
+if it involves cookies, don't do it
+better to offer them a url coded thing at the bottom of the page
+
+add a fullscreen button
+
+devise a visual way for a user to design practice sessions, like to loop all of the major scales,
+2 repetitions for each one, something like that
