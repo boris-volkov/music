@@ -133,7 +133,6 @@ class Structure_Collection { // one of these will hold all of the chords, for ex
 
 const intervals = new Structure_Collection('interval_types',
 [
-    ['octave'       ,   [0,12]      ],
     ['min 2nd'      ,   [0, 1]      ],
     ['Maj 2nd'      ,   [0, 2]      ],
     ['min 3rd'      ,   [0, 3]      ],

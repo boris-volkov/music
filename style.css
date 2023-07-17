@@ -19,7 +19,7 @@ pre {
 	min-height : 6vh;
 	padding-top : 2vw;
 	padding-bottom: 2vw;
-	font: 36px Courier;
+	font: 24px Courier;
 	letter-spacing : 2px;
 	color : white;
 	white-space: pre-wrap;
@@ -47,12 +47,12 @@ div#choices{
 div#choices button{
 	margin: 0;
 	margin-right: 10px;
-	font-size: larger;
+	font-size: large;
 }
 
 div.selection_title{
 	font-family: 'Courier New', Courier, monospace;
-	font-size: x-large;
+	font-size: large;
 	font-weight: 900;
 }
 
@@ -167,8 +167,10 @@ button {
 	border-radius: 10%;
 	font-family: 'Courier New', Courier, monospace;
 	font-weight: bolder;
-	font-size: larger;
+	font-size: large;
 	padding: 5px;
+	padding-right: 10px;
+	padding-left: 10px;
 	margin-right: 4px;
 	margin-left: 4px;
 	margin-top: 20px;
@@ -176,21 +178,8 @@ button {
 	background-color: rgb(191, 208, 234);
 }
 
-div#choices button{
-	background-color: rgb(181, 136, 136);
-	margin: 0;
-	margin-right: 10px;
-}
-
-div#choices button.active {
+button.active {
 	background-color: rgb(160, 214, 160);
-}
-
-div#choices button{
-	background-color: rgb(181, 136, 136);
-	margin: 0;
-	margin-right: 10px;
-	margin-bottom: 5px;
 }
 
 button:hover {

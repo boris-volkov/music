@@ -16,15 +16,29 @@ function random_interval(){
     }
 }
 
-function interval_quiz(e){
-    if (haveSameElements(addConstantModulo12(notes_down, 0), interval_array)){
+function interval_callback(event){
+    [type, key, intensity] = event.data;
+    
+    interval_held = [... new Set(addConstantModulo12(notes_down, 0))]
+    if (haveSameElements(addConstantModulo12(interval_held, 0), interval_array)){
+        interval_held.forEach((note) => {
+            green_key(note);
+        });
+        interval_found = true;
+    }
+
+    if (type == KEYUP && interval_found){ 
+        interval_held.forEach((note) => {
+            unlight_key(note);
+        });
+        interval_found = false;
         random_interval();
     }
 }
 
 function init_interval(){
     canvas.style.display = 'none';
-    init_quiz(random_interval, interval_quiz);
+    init_quiz(random_interval, interval_callback);
 }
 
 add_game_button('intervals', init_interval);
