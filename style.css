@@ -23,7 +23,7 @@ pre {
 	letter-spacing : 2px;
 	color : white;
 	white-space: pre-wrap;
-	word-break: break-all;
+	word-break: break-word;
 	cursor: text;
 	margin-top: 10px;
 	margin-bottom: 0px;
@@ -39,8 +39,10 @@ div#choices{
 	width: 100%;
 	border-radius: 10px;
 	margin-top: 10px;
+	padding-top: 10px;
 	margin-bottom: 10px;
-	border: solid;
+	border: dashed;
+	border-color: #ABC;
 	flex-direction: column;
 }
 

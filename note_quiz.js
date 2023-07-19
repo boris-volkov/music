@@ -1,12 +1,13 @@
 let note, prev;
 
 function random_note(){
+    if ( (note  = notes.get_random()) == null) return;
     while (note == prev){
-        note = get_random_note();
+        note = notes.get_random();
     }
     prev = note;
     clear();
-    print(get_note_name(note));
+    print(note.name);
 }
 
 function note_callback(e){
@@ -14,12 +15,12 @@ function note_callback(e){
 
     // should be only if event is a notedown
     // and if the notes_down container has that note exclusively ?
-    if (note % 12 == key % 12){
+    if (note.number % 12 == key % 12){
         green_key(key);
     }
 
-    if (type == KEYUP && key % 12 == note % 12){
-        unlight_key(note);
+    if (type == KEYUP && key % 12 == note.number % 12){
+        unlight_key(key);
         random_note();
     }
 }

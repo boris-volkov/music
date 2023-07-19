@@ -14,12 +14,12 @@ const ordinal = {
 }
 
 function random_scale_degree(){
-    scale_base = get_random_note();
-    if ( (scale = scales.get_random()) == null) return;
+    if ( (scale_base = notes.get_random() ) == null) return;
+    if ( (scale = scales.get_random() ) == null) return;
     index = rand_index(scale.notes);
-    scale_array = addConstantModulo12(scale.notes, scale_base);
+    scale_array = addConstantModulo12(scale.notes, scale_base.number);
     note_to_guess = scale_array[index]%12;
-    cprint ( ordinal[index] + ' note of ' + get_note_name(scale_base) + ' ' + scale.name);
+    cprint ( ordinal[index] + ' note of ' + scale_base.name + ' ' + scale.name);
 }
 
 function scale_degree_callback(event){

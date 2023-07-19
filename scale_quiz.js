@@ -65,13 +65,13 @@ function generate_octaves(s){ // should be an option to change number of octaves
 
 function random_scale(){
     refresh();
-    scale_base = get_random_note();
     if ( (scale = scales.get_random()) == null) return;
+    if ( (scale_base = notes.get_random()) == null) return;
     scale_type = scale.name;
     scale_notes = scale.notes;
     scale_array = generate_octaves(scale_notes);   
-    scale_array = addConstantModulo12(scale_array, scale_base)
-    cprint(get_note_name(scale_base) + ' ' + scale_type);
+    scale_array = addConstantModulo12(scale_array, scale_base.number)
+    cprint(scale_base.name + ' ' + scale_type);
 }
 
 function scale_listener(event){

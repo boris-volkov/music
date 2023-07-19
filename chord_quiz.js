@@ -1,22 +1,18 @@
 //TODO add slash chords
 
-let kind, notes, base = null;
+let kind, base = null;
 let chord_found;
 let chord_array;
 let chord_held = []; // notes currently held by the user, treated as a set
-let last_chord, last_base; 
+
 
 function random_chord(){
     if ( (chord = chords.get_random()) == null) return;
-    base = get_random_note();
-    while (last_chord == chord && base == last_base){ 
-        chord = chords.get_random();
-        base = get_random_note();
-    }
+    if ( (base  = notes.get_random()) == null) return;
     last_chord = chord;
     last_base = base;
-    chord_array = addConstantModulo12(chord.notes, base)
-    cprint(get_note_name(base) + chord.name);
+    chord_array = addConstantModulo12(chord.notes, base.number)
+    cprint(base.name + chord.name);
 }
 
 function chord_callback(event){

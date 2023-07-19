@@ -2,17 +2,17 @@ let interval_kind, interval_notes, interval_base = null;
 let interval_array;
 
 function random_interval(){
-    interval_base = get_random_note();
+    if ( (interval_base = notes.get_random()) == null) return;
     if ( (interval = intervals.get_random()) == null) return;
     interval_kind = interval.name;
     interval_notes = interval.notes;
     if (Math.random() < 0.5){
         interval_notes = reflectIntervals(interval_notes);
-        interval_array = addConstantModulo12(interval_notes, interval_base);
-        terminal.innerHTML = interval_kind + " below " + get_note_name(interval_base);
+        interval_array = addConstantModulo12(interval_notes, interval_base.number);
+        terminal.innerHTML = interval_kind + " below " + get_note_name(interval_base.number);
     } else {
-        interval_array = addConstantModulo12(interval_notes, interval_base);
-        terminal.innerHTML = interval_kind + " above " + get_note_name(interval_base);
+        interval_array = addConstantModulo12(interval_notes, interval_base.number);
+        terminal.innerHTML = interval_kind + " above " + get_note_name(interval_base.number);
     }
 }
 
