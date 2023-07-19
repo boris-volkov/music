@@ -90,13 +90,24 @@ If you play correctly, the keys will light up green, and you will move on.
         const toggleButton = document.getElementById('options_toggle');
         const contentDiv = document.getElementById('choices');
 
-        toggleButton.addEventListener('click', () => {
+        function optionsOn(){
+            toggleButton.classList.add("active");
+            contentDiv.style.display = 'flex';
+        }
+        
+        function optionsOff(){
+            toggleButton.classList.remove("active");
+            contentDiv.style.display = 'none';
+        }
+
+        toggleButton.addEventListener('pointerdown', () => {
             contentDiv.style.display = contentDiv.style.display === 'none' ? 'flex' : 'none';
+            toggleButton.classList.toggle("active");
         });
 
         // this next code can check and change the color properties of the page
         // const colorButton = document.getElementById('color_button')
-        // colorButton.addEventListener('click', () => {
+        // colorButton.addEventListener('pointerdown', () => {
         //     document.documentElement.style.setProperty('--bg_color', '#321');
         //     console.log(document.documentElement.style.getPropertyValue('--bg_color'));
         // });

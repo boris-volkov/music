@@ -13,10 +13,9 @@ function init_quiz(starter, callback){ // sending both funcs sucks becuase the c
 } // this function should also set up a cleanup function 
 
 function add_game_button(name, func){
-
   const button = document.createElement('button');
   button.textContent = name;
-  button.addEventListener('click', function () {
+  button.addEventListener('pointerdown', function () {
       func();
 
       // deactivate all other buttons and activate this one
@@ -25,6 +24,7 @@ function add_game_button(name, func){
         b.classList.remove("active");
       });
       this.classList.add("active");
+      optionsOff();
 });
   const container = document.getElementById('game_choices');
   container.appendChild(button);
@@ -33,7 +33,7 @@ function add_game_button(name, func){
 
 const fullscreenBtn = document.getElementById('full_screen');
 
-fullscreenBtn.addEventListener('click', toggleFullscreen);
+fullscreenBtn.addEventListener('pointerdown', toggleFullscreen);
 
 function toggleFullscreen() {
   if (document.fullscreenElement) {

@@ -57,7 +57,7 @@ class Notes {
     createButton(note) {
         const button = document.createElement('button');
         button.textContent = note.name;
-        button.addEventListener('click', () => {
+        button.addEventListener('pointerdown', () => {
             note.toggle();
             button.classList.toggle('active', note.active);
         });
@@ -75,7 +75,7 @@ class Notes {
     createAllButton() {
         const allButton = document.createElement('button');
         allButton.textContent = 'All';
-        allButton.addEventListener('click', () => {
+        allButton.addEventListener('pointerdown', () => {
           const allActive = !this.list.every((structure) => structure.active);
           this.list.forEach((structure) => {
             structure.active = allActive;
@@ -90,7 +90,7 @@ class Notes {
 }
 
 class Note {
-    constructor(name, number, active = false) {
+    constructor(name, number, active = true) {
         this.name = name;
         this.number = number;
         this.active = active;
@@ -151,7 +151,9 @@ function get_random_note() {
 }
 
 class Structure {
-    constructor(name, notes, active = false) {
+    // constructor(name, notes, active = localStorage.getItem('active') === 'true' || true)
+    // migrate to this when switching to local storage  
+    constructor(name, notes, active = true) {
       this.name = name;
       this.notes = notes;
       this.active = active;
@@ -218,7 +220,7 @@ class Structure {
     createButton(structure) {
       const button = document.createElement('button');
       button.textContent = structure.name;
-      button.addEventListener('click', () => {
+      button.addEventListener('pointerdown', () => {
         structure.toggle();
       });
       button.addEventListener('mouseover', () => {
@@ -234,7 +236,7 @@ class Structure {
     createAllButton() {
         const allButton = document.createElement('button');
         allButton.textContent = 'All';
-        allButton.addEventListener('click', () => {
+        allButton.addEventListener('pointerdown', () => {
           const allActive = !this.list.every((structure) => structure.active);
           this.list.forEach((structure) => {
             structure.active = allActive;
