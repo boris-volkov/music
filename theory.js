@@ -40,23 +40,6 @@ class Structure { // should these be responsible for setting their own button in
       this.notes = notes;
       this.active = active;
     }
-  
-    share_at_least(n, other) {
-        // want  to use this for more natural-sounding chord progressions
-        // making sure that consecutive chords at least share a few notes. 
-        const set1 = new Set(this.notes);
-        let count = 0;
-      
-        for (let i = 0; i < other.notes.length; i++) {
-          if (set1.has(other.notes[i])) {
-            count++;
-            if (count >= n) {
-              return true;
-            }
-          }
-        }
-        return false;
-    }
 
     invert(n){ // really should only apply to a chord class
         // this works but it really messes up the naming conventions 
@@ -133,17 +116,28 @@ class Structure_Collection { // one of these will hold all of the chords, for ex
 
 const intervals = new Structure_Collection('interval_types',
 [
-    ['min 2nd'      ,   [0, 1]      ],
-    ['Maj 2nd'      ,   [0, 2]      ],
-    ['min 3rd'      ,   [0, 3]      ],
-    ['Maj 3rd'      ,   [0, 4]      ],
-    ['4th'          ,   [0, 5]      ],
-    ['tritone'      ,   [0, 6]      ],
-    ['5th'          ,   [0, 7]      ],
-    ['min 6th'      ,   [0, 8]      ],
-    ['Maj 6th'      ,   [0, 9]      ],
-    ['min 7th'      ,   [0, 10]     ],
-    ['Maj 7th'      ,   [0, 11]     ],
+    ['min 2nd above %NOTE%', [0, 1]],
+    ['min 2nd below %NOTE%', [0, -1]],
+    ['Maj 2nd above %NOTE%', [0, 2]],
+    ['Maj 2nd below %NOTE%', [0, -2]],
+    ['min 3rd above %NOTE%', [0, 3]],
+    ['min 3rd below %NOTE%', [0, -3]],
+    ['Maj 3rd above %NOTE%', [0, 4]],
+    ['Maj 3rd below %NOTE%', [0, -4]],
+    ['4th above %NOTE%', [0, 5]],
+    ['4th below %NOTE%', [0, -5]],
+    ['tritone above %NOTE%', [0, 6]],
+    ['tritone below %NOTE%', [0, -6]],
+    ['5th above %NOTE%', [0, 7]],
+    ['5th below %NOTE%', [0, -7]],
+    ['min 6th above %NOTE%', [0, 8]],
+    ['min 6th below %NOTE%', [0, -8]],
+    ['Maj 6th above %NOTE%', [0, 9]],
+    ['Maj 6th below %NOTE%', [0, -9]],
+    ['min 7th above %NOTE%', [0, 10]],
+    ['min 7th below %NOTE%', [0, -10]],
+    ['Maj 7th above %NOTE%', [0, 11]],
+    ['Maj 7th below %NOTE%', [0, -11]]
 ]);
 
 const scales = new Structure_Collection('scale_types',
@@ -157,19 +151,25 @@ const scales = new Structure_Collection('scale_types',
 
 const chords = new Structure_Collection('chord_types',
 [
-    ['5'            ,   [0,7]           ],
-    ['m'            ,   [0,3,7]         ],
-    ['M'            ,   [0,4,7]         ],
-    ['dim'          ,   [0,3,6]         ],
-    ['+'            ,   [0,4,8]         ],
-    ['sus2'         ,   [0,2,7]         ],
-    ['sus4'         ,   [0,5,7]         ],
-    ['M7'           ,   [0,4,7,11]      ],
-    ['m7'           ,   [0,3,7,10]      ],
-    ['7'            ,   [0,4,7,10]      ],
-    ['m7♭5'         ,   [0,3,6,10]      ],   
-    ['6'            ,   [0,4,7,9]       ],
-    ['m6'           ,   [0,3,7,9]       ],
-    ['dim7'         ,   [0,3,6,9]       ],
-    ['9'            ,   [0,4,7,10,14]   ],
+    ['%NOTE%5', [0, 7]],
+    ['%NOTE%m', [0, 3, 7]],
+    ['%NOTE%', [0, 4, 7]],
+    ['%NOTE%dim', [0, 3, 6]],
+    ['%NOTE%+', [0, 4, 8]],
+    ['%NOTE%sus2', [0, 2, 7]],
+    ['%NOTE%sus4', [0, 5, 7]],
+    ['%NOTE%maj7', [0, 4, 7, 11]],
+    ['%NOTE%m7', [0, 3, 7, 10]],
+    ['%NOTE%7', [0, 4, 7, 10]],
+    ['%NOTE%m7♭5', [0, 3, 6, 10]],
+    ['%NOTE%6', [0, 4, 7, 9]],
+    ['%NOTE%m6', [0, 3, 7, 9]],
+    ['%NOTE%dim7', [0, 3, 6, 9]],
+    ['%NOTE%9', [0, 4, 7, 10, 14]],
+    ['%NOTE%maj9', [0, 4, 7, 11, 14]],
+    ['%NOTE%m9', [0, 3, 7, 10, 14]],
+    ['%NOTE%9', [0, 4, 7, 10, 14]],
+    ['%NOTE%6/9', [0, 4, 7, 9, 14]],
+    ['%NOTE%13', [0, 4, 7, 10, 14, 17, 21]],
+    ['%NOTE%7sus4', [0, 5, 7, 10]]
 ]);

@@ -1,67 +1,33 @@
-
 // maybe should prime with a false answer like my math game
 // furthermore there should probably be a class for the quiz itself that calls this 
 // function at init time. 
 function init_quiz(starter, callback){ // sending both funcs sucks becuase the callback calls the starter anyway
-    starter();
-    midi.inputs.forEach((entry) => {
-        entry.onmidimessage = (e) => { // add listener to all midi inputs
-          onMIDIMessage(e);
-          callback(e);
-      }
-  });
+  starter();
+  midi.inputs.forEach((entry) => {
+      entry.onmidimessage = (e) => { // add listener to all midi inputs
+        onMIDIMessage(e);
+        callback(e);
+    }
+});
 } // this function should also set up a cleanup function 
 
 function add_game_button(name, func){
 
-  const button = document.createElement('button');
-  button.textContent = name;
-  button.addEventListener('click', function () {
-      func();
+const button = document.createElement('button');
+button.textContent = name;
+button.addEventListener('click', function () {
+    func();
 
-      // deactivate all other buttons and activate this one
-      const others = document.querySelectorAll("#game_choices button");
-      others.forEach((b) => {
-        b.classList.remove("active");
-      });
-      this.classList.add("active");
+    // deactivate all other buttons and activate this one
+    const others = document.querySelectorAll("#game_choices button");
+    others.forEach((b) => {
+      b.classList.remove("active");
+    });
+    this.classList.add("active");
 });
-  const container = document.getElementById('game_choices');
-  container.appendChild(button);
+const container = document.getElementById('game_choices');
+container.appendChild(button);
 }
-
-
-const fullscreenBtn = document.getElementById('full_screen');
-
-fullscreenBtn.addEventListener('click', toggleFullscreen);
-
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    // Exit fullscreen
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.mozCancelFullScreen) { // Firefox
-      document.mozCancelFullScreen();
-    } else if (document.webkitExitFullscreen) { // Chrome, Safari, Opera
-      document.webkitExitFullscreen();
-    } else if (document.msExitFullscreen) { // Internet Explorer
-      document.msExitFullscreen();
-    }
-  } else {
-    // Enter fullscreen
-    const element = document.documentElement;
-    if (element.requestFullscreen) {
-      element.requestFullscreen();
-    } else if (element.mozRequestFullScreen) { // Firefox
-      element.mozRequestFullScreen();
-    } else if (element.webkitRequestFullscreen) { // Chrome, Safari, Opera
-      element.webkitRequestFullscreen();
-    } else if (element.msRequestFullscreen) { // Internet Explorer
-      element.msRequestFullscreen();
-    }
-  }
-}
-
 
 
 function addConstantModulo12(array, constant) {
