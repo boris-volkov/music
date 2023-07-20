@@ -31,38 +31,6 @@ function add_game_button(name, func){
 }
 
 
-const fullscreenBtn = document.getElementById('full_screen');
-
-fullscreenBtn.addEventListener('pointerdown', toggleFullscreen);
-
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    // Exit fullscreen
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.mozCancelFullScreen) { // Firefox
-      document.mozCancelFullScreen();
-    } else if (document.webkitExitFullscreen) { // Chrome, Safari, Opera
-      document.webkitExitFullscreen();
-    } else if (document.msExitFullscreen) { // Internet Explorer
-      document.msExitFullscreen();
-    }
-  } else {
-    // Enter fullscreen
-    const element = document.documentElement;
-    if (element.requestFullscreen) {
-      element.requestFullscreen();
-    } else if (element.mozRequestFullScreen) { // Firefox
-      element.mozRequestFullScreen();
-    } else if (element.webkitRequestFullscreen) { // Chrome, Safari, Opera
-      element.webkitRequestFullscreen();
-    } else if (element.msRequestFullscreen) { // Internet Explorer
-      element.msRequestFullscreen();
-    }
-  }
-}
-
-
 
 function addConstantModulo12(array, constant) {
     return array.map(element => (element + constant) % 12);

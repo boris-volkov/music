@@ -27,6 +27,7 @@ function refresh(){ // this seems like wasteful repetition
 }
 
 function open_dots(){ // this function is messy and it sucks, simplify it
+    // also it doesn't work right for shorter scales.
     let x_ = 0;
     ctx.fillStyle = "#123";
 
@@ -91,7 +92,7 @@ function scale_listener(event){
     } //  should also clear the sequence if it does not match the first part of the scale ?
 }
 
-function scale_cleanup(){
+function scale_cleanup(){ // is this ever used?
     clearInterval(id);
     refresh();
 }

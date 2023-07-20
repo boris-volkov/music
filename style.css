@@ -6,6 +6,7 @@ body {
 	background-color: var(--bg_color);
     display: flex;
     justify-content: center;
+	letter-spacing: 1pt;
 }
 
 pre {
@@ -54,7 +55,7 @@ div#choices button{
 
 div.selection_title{
 	font-family: 'Courier New', Courier, monospace;
-	font-size: large;
+	font-size: larger;
 	font-weight: 900;
 }
 
@@ -168,8 +169,9 @@ div#game_choices{
 button {
 	border-radius: 10%;
 	font-family: 'Courier New', Courier, monospace;
-	font-weight: bolder;
+	font-weight: bold;
 	font-size: large;
+	letter-spacing: 1pt;
 	padding: 5px;
 	padding-right: 10px;
 	padding-left: 10px;

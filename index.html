@@ -34,7 +34,7 @@
                     <div id = "chord_types" class="selection"></div>
                 </div>
                 <div class="choice_holder">
-                    <div class="selection_title">scales</div>
+                    <div class="selection_title">scales and modes</div>
                     <div id = "scale_types" class="selection"></div>
                 </div>
             </div>
@@ -84,35 +84,7 @@ If you play correctly, the keys will light up green, and you will move on.
     <script src = "chord_quiz.js"   ></script>
     <script src = "scale_quiz.js"   ></script>
     <script src = "scale_degrees.js"></script>
-
-
-    <script>
-        const toggleButton = document.getElementById('options_toggle');
-        const contentDiv = document.getElementById('choices');
-
-        function optionsOn(){
-            toggleButton.classList.add("active");
-            contentDiv.style.display = 'flex';
-        }
-        
-        function optionsOff(){
-            toggleButton.classList.remove("active");
-            contentDiv.style.display = 'none';
-        }
-
-        toggleButton.addEventListener('pointerdown', () => {
-            contentDiv.style.display = contentDiv.style.display === 'none' ? 'flex' : 'none';
-            toggleButton.classList.toggle("active");
-        });
-
-        // this next code can check and change the color properties of the page
-        // const colorButton = document.getElementById('color_button')
-        // colorButton.addEventListener('pointerdown', () => {
-        //     document.documentElement.style.setProperty('--bg_color', '#321');
-        //     console.log(document.documentElement.style.getPropertyValue('--bg_color'));
-        // });
-
-    </script>
+    <script src = "buttons.js"      ></script>
 
 </body>
 
