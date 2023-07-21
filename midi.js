@@ -73,11 +73,20 @@ class MidiMessage {
     this.data2 = data2;
   }
 
+  
   send() {
     const outputs = midi.outputs;
-    // Assuming you have the output you want to use, replace "outputId" with your desired output ID
-    const output = outputs.get("output-1");
+    const outputIterator = outputs.values();
+    const firstOutput = outputIterator.next().value;
+  
+    if (!firstOutput) {
+      console.error("No MIDI output available.");
+      return;
+    }
+  
+    const output = firstOutput;
     output.send([this.status, this.data1, this.data2]);
+  
     // Assuming Note On message (status: 0x90), schedule a Note Off message after 1 second
     if (this.status === 0x90) {
       setTimeout(() => {
@@ -85,6 +94,8 @@ class MidiMessage {
       }, 1000);
     }
   }
+  
+  
 }
 
 function sequentially(functions, delay) {
