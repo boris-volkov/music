@@ -6,14 +6,8 @@ function random_interval(){
     if ( (interval = intervals.get_random()) == null) return;
     interval_kind = interval.name;
     interval_notes = interval.notes;
-    if (Math.random() < 0.5){
-        interval_notes = reflectIntervals(interval_notes);
-        interval_array = addConstantModulo12(interval_notes, interval_base.number);
-        terminal.innerHTML = interval_kind + " below " + get_note_name(interval_base.number);
-    } else {
-        interval_array = addConstantModulo12(interval_notes, interval_base.number);
-        terminal.innerHTML = interval_kind + " above " + get_note_name(interval_base.number);
-    }
+    interval_array = addConstantModulo12(interval_notes, interval_base.number);
+    cprint(interval.name + ' ' + interval_base.name);
 }
 
 function interval_callback(event){

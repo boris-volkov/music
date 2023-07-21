@@ -4,7 +4,7 @@
 
 let scale, scale_type, scale_notes, scale_base, scale_array;
 let id, x // id of the canvas clearing interval, and initial drawing coordinate
-let scale_length = 29; // default length of a 2 octave scale 
+let scale_length; // default length of a 2 octave scale 
 
 // fix these numbers, make it look good 
 let x_step = Math.floor(canvas.width/(scale_length+1));
@@ -30,6 +30,8 @@ function open_dots(){ // this function is messy and it sucks, simplify it
     // also it doesn't work right for shorter scales.
     let x_ = 0;
     ctx.fillStyle = "#123";
+
+    dot_coordinates = [];
 
     for (let y_ = 0; y_ < (scale_length-1)/2; y_ ++){
         x_ += x_step
@@ -61,6 +63,9 @@ function generate_octaves(s){ // should be an option to change number of octaves
     rev = s.slice().reverse();
     up_down = [...s, ...s, 0, ...rev, ...rev];
     scale_length = up_down.length;
+    x_step = Math.floor(canvas.width/(scale_length+1));
+    y_step = Math.floor(canvas.height/((scale_length)/2)) - 2;
+    refresh();
     return up_down;
 }
 

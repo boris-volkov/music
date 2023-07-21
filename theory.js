@@ -250,20 +250,30 @@ class Structure_Collection {
   }
 }
 
-const intervals = new Structure_Collection('interval_types',
-  [
-    ['min 2nd', [0, 1]],
-    ['Maj 2nd', [0, 2]],
-    ['min 3rd', [0, 3]],
-    ['Maj 3rd', [0, 4]],
-    ['4th', [0, 5]],
-    ['tritone', [0, 6]],
-    ['5th', [0, 7]],
-    ['min 6th', [0, 8]],
-    ['Maj 6th', [0, 9]],
-    ['min 7th', [0, 10]],
-    ['Maj 7th', [0, 11]],
-  ]);
+const intervals = new Structure_Collection('interval_types', [
+  ['min 2nd above', [0, 1]],
+  ['min 2nd below', [0, -1]],
+  ['Maj 2nd above', [0, 2]],
+  ['Maj 2nd below', [0, -2]],
+  ['min 3rd above', [0, 3]],
+  ['min 3rd below', [0, -3]],
+  ['Maj 3rd above', [0, 4]],
+  ['Maj 3rd below', [0, -4]],
+  ['4th above', [0, 5]],
+  ['4th below', [0, -5]],
+  ['tritone above', [0, 6]],
+  ['tritone below', [0, -6]],
+  ['5th above', [0, 7]],
+  ['5th below', [0, -7]],
+  ['min 6th above', [0, 8]],
+  ['min 6th below', [0, -8]],
+  ['Maj 6th above', [0, 9]],
+  ['Maj 6th below', [0, -9]],
+  ['min 7th above', [0, 10]],
+  ['min 7th below', [0, -10]],
+  ['Maj 7th above', [0, 11]],
+  ['Maj 7th below', [0, -11]]
+]);
 
 
   const scales = new Structure_Collection('scale_types', [
