@@ -1,5 +1,5 @@
 let interval_kind, interval_notes, interval_base = null;
-let interval_array;
+let interval_array, interval_found;
 
 function random_interval(){
     if ( (interval_base = notes.get_random()) == null) return;

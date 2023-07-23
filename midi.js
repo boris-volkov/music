@@ -73,7 +73,6 @@ class MidiMessage {
     this.data2 = data2;
   }
 
-  
   send() {
     const outputs = midi.outputs;
     const outputIterator = outputs.values();
