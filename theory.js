@@ -191,6 +191,7 @@ class Structure {
   }
 }
 
+
 class Structure_Collection {
   constructor(name, list) {
     this.name = name;

@@ -30,10 +30,12 @@ function add_game_button(name, func){
   container.appendChild(button);
 }
 
-
+Number.prototype.mod = function(n) {
+  return ((this%n)+n)%n;
+};
 
 function addConstantModulo12(array, constant) {
-    return array.map(element => (element + constant) % 12);
+    return array.map(element => (element + constant).mod(12));
 }
 
 function reflectIntervals(array){ // TODO get rid of this somehow
