@@ -49,8 +49,11 @@ function render_notation(vexKeys) {
 
     const staveNote = new VF.StaveNote({ keys: vexKeys, duration: 'q' });
     vexKeys.forEach((key, i) => {
-        if (key.includes('#')) staveNote.addModifier(new VF.Accidental('#'), i);
-        else if (key.includes('b')) staveNote.addModifier(new VF.Accidental('b'), i);
+        // accidental is whatever sits between the note letter and the "/octave" --
+        // can't just check key.includes('b'), since "b" is also a real note letter (natural B)
+        const accidental = key.slice(1, key.indexOf('/'));
+        if (accidental === '#') staveNote.addModifier(new VF.Accidental('#'), i);
+        else if (accidental === 'b') staveNote.addModifier(new VF.Accidental('b'), i);
     });
 
     VF.Formatter.FormatAndDraw(context, stave, [staveNote]);
