@@ -108,4 +108,4 @@ function init_scale(){
     init_quiz(random_scale, scale_listener); 
 }
 
-add_game_button('scales', init_scale);
+add_game_button('Modes', init_scale, 'menu_chords_scales', 'clay');

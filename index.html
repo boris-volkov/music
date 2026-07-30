@@ -4,74 +4,88 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Theory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-
 </head>
 
 <body>
     <div id = "outer">
-        <div id = "quiz">
-            <div id = "buttons">
+        <div id = "header">
+            <h1>Music Theory</h1>
+            <span id = "kicker">PRACTICE</span>
+            <button id = "full_screen" title="Toggle fullscreen">&#9974;</button>
+        </div>
+        <div id = "midi_status">Checking for MIDI access&hellip;</div>
+        <div id = "app_grid">
+            <div id = "left_column">
+                <div id = "instructions">
+                    <div>&rarr; Select a topic below</div>
+                    <div>&rarr; Play the shown notes</div>
+                    <div>&rarr; Keys light green when correct</div>
+                </div>
                 <div id = "game_choices">
+                    <div class="menu_panel">
+                        <div class="menu_panel_header">Base Notes</div>
+                        <div class="menu_panel_body" id = "menu_base_notes"></div>
+                    </div>
+                    <div class="menu_panel">
+                        <div class="menu_panel_header">Intervals</div>
+                        <div class="menu_panel_body" id = "menu_intervals"></div>
+                    </div>
+                    <div class="menu_panel">
+                        <div class="menu_panel_header">Chords &amp; Scales</div>
+                        <div class="menu_panel_body" id = "menu_chords_scales"></div>
+                    </div>
                 </div>
-                <div id = "option_buttons">
-                    <button id = "options_toggle">*</button>
-                    <button id = "color_button">~</button>
-                    <button id = "full_screen">±</button>
+                <button id = "options_toggle">&#9881; MORE OPTIONS</button>
+            </div>
+            <div id = "right_column">
+                <div id = choices style="display: none">
+                    <div class="choice_holder">
+                        <div class="selection_title">base notes of chords, intervals, and scales</div>
+                        <div id = "note_types" class="selection"></div>
+                    </div>
+                    <div class="choice_holder">
+                        <div class="selection_title">intervals</div>
+                        <div id = "interval_types" class="selection"></div>
+                    </div>
+                    <div class="choice_holder">
+                        <div class="selection_title">chords</div>
+                        <div id = "chord_types" class="selection"></div>
+                    </div>
+                    <div class="choice_holder">
+                        <div class="selection_title">scales and modes</div>
+                        <div id = "scale_types" class="selection"></div>
+                    </div>
+                </div>
+                <button id = "notation_toggle" title="Toggle musical notation">&#9834; Notation</button>
+                <pre id = "terminal">Select a topic to begin.</pre>
+                <div id = "notation" style="display: none"></div>
+                <canvas id	= "visuals" style="display: none"></canvas>
+                <div id = "keyboard">
+                    <div id = "black_keys">
+                        <div id = "1"   class= "black" style="left: 10.04%;"></div>
+                        <div id = "3"   class= "black" style="left: 24.32%;"></div>
+                        <div id = "6"   class= "black" style="left: 52.89%;"></div>
+                        <div id = "8"   class= "black" style="left: 67.18%;"></div>
+                        <div id = "10"  class= "black" style="left: 81.46%;"></div>
+                    </div>
+                    <div id = "white_keys">
+                        <div id = "0"   class= "white"><span class="key_label">C</span></div>
+                        <div id = "2"   class= "white"><span class="key_label">D</span></div>
+                        <div id = "4"   class= "white"><span class="key_label">E</span></div>
+                        <div id = "5"   class= "white"><span class="key_label">F</span></div>
+                        <div id = "7"   class= "white"><span class="key_label">G</span></div>
+                        <div id = "9"   class= "white"><span class="key_label">A</span></div>
+                        <div id = "11"  class= "white"><span class="key_label">B</span></div>
+                    </div>
                 </div>
             </div>
-            <div id = choices style="display: none">
-                <div class="choice_holder">
-                    <div class="selection_title">base notes of chords, intervals, and scales</div>
-                    <div id = "note_types" class="selection"></div>
-                </div>
-                <div class="choice_holder">
-                    <div class="selection_title">intervals</div>
-                    <div id = "interval_types" class="selection"></div>
-                </div>
-                <div class="choice_holder">
-                    <div class="selection_title">chords</div>
-                    <div id = "chord_types" class="selection"></div>
-                </div>
-                <div class="choice_holder">
-                    <div class="selection_title">scales and modes</div>
-                    <div id = "scale_types" class="selection"></div>
-                </div>
-            </div>
-            <pre id = "terminal">Let's practice! 
-Open the options menu with the [*] button to choose what shows up in your practice.
-Select a practice topic on the top left to begin. 
-Play on the keyboard whatever shows up on this screen.
-If you play correctly, the keys will light up green, and you will move on.
-        </pre>
-            <canvas id	= "visuals" style="display: none"></canvas><br>
         </div>
-        <div id = "keyboard">
-            <div id = "black_keys">
-                <div class="clear"></div>
-                <div id = "1"   class= "black"></div>
-                <div class="clear"></div>
-                <div id = "3"   class= "black"></div>
-                <div class="clear"></div>
-                <div class="clear"></div>
-                <div id = "6"   class= "black"></div>
-                <div class="clear"></div>
-                <div id = "8"   class= "black"></div>
-                <div class="clear"></div>
-                <div id = "10"  class= "black"></div>
-                <div class="clear"></div>
-            </div>
-            <div id = "white_keys">
-                <div id = "0"   class= "white"></div>
-                <div id = "2"   class= "white"></div>
-                <div id = "4"   class= "white"></div>
-                <div id = "5"   class= "white"></div>
-                <div id = "7"   class= "white"></div>
-                <div id = "9"   class= "white"></div>
-                <div id = "11"  class= "white"></div>
-            </div>
-        </div>
-        
     </div>
     <script src = "utility.js"      ></script>
     <script src = "canvas.js"       ></script>
@@ -79,6 +93,9 @@ If you play correctly, the keys will light up green, and you will move on.
     <script src = "midi.js"         ></script>
     <script src = "terminal.js"     ></script>
     <script src = "theory.js"       ></script>
+    <script src = "quiz_helpers.js" ></script>
+    <script src = "https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    <script src = "notation.js"     ></script>
     <script src = "note_quiz.js"    ></script>
     <script src = "interval_quiz.js"></script>
     <script src = "chord_quiz.js"   ></script>

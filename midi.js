@@ -4,11 +4,37 @@ let last_note_time; // holds the time of the last note played
 const KEYDOWN = 0x90;
 const KEYUP = 0x80;
 
-navigator.requestMIDIAccess().then(init, onMIDIFailure);
+let current_quiz_callback = null; // set by init_quiz, rebound onto every input as it (dis)connects
 
+const midi_status = document.getElementById('midi_status');
+
+function set_midi_status(message, level) { // level: 'ok' | 'warn' | 'error'
+  if (!midi_status) return;
+  midi_status.textContent = message;
+  midi_status.classList.remove('status-ok', 'status-warn', 'status-error');
+  midi_status.classList.add('status-' + level);
+}
+
+if (navigator.requestMIDIAccess) {
+  set_midi_status('Looking for a MIDI keyboard…', 'warn');
+  navigator.requestMIDIAccess().then(init, onMIDIFailure);
+} else {
+  set_midi_status('This browser does not support Web MIDI — try Chrome, Edge, or Opera.', 'error');
+}
 
 function onMIDIFailure(msg) {
   console.error(`Failed to get MIDI access - ${msg}`);
+  set_midi_status('MIDI access was denied — allow MIDI access and reload the page.', 'error');
+}
+
+function refresh_midi_status() {
+  if (!midi) return;
+  if (midi.inputs.size === 0) {
+    set_midi_status('No MIDI keyboard detected — plug one in to start practicing.', 'warn');
+    return;
+  }
+  const names = [...midi.inputs.values()].map((input) => input.name).join(', ');
+  set_midi_status(`Connected: ${names}`, 'ok');
 }
 
 function listInputsAndOutputs(midiAccess) {
@@ -41,7 +67,12 @@ function logMidi(event){
 function init(midiAccess) {
     midi = midiAccess;
     listInputsAndOutputs(midiAccess);
-    startLoggingMIDIInput(midiAccess);
+    bindMidiInputs();
+    refresh_midi_status();
+    midi.onstatechange = () => { // fires when a keyboard is plugged in or unplugged
+        bindMidiInputs();
+        refresh_midi_status();
+    };
 }
 
 
@@ -60,9 +91,13 @@ function onMIDIMessage(event) { // default function to run on each keypress
   bass_note = Math.min(...notes_down); // I feel like this might create some race condition with the other listeners
 }
   
-function startLoggingMIDIInput(midiAccess, indexOfPort) { //sets onmidimessage listener for each input 
-    midiAccess.inputs.forEach((entry) => {
-        entry.onmidimessage = onMIDIMessage;
+function bindMidiInputs() { // (re)attaches the message handler to every currently connected input
+    if (!midi) return;
+    midi.inputs.forEach((entry) => {
+        entry.onmidimessage = (e) => {
+            onMIDIMessage(e);
+            if (current_quiz_callback) current_quiz_callback(e);
+        };
     });
 }
 

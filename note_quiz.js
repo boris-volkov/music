@@ -6,28 +6,14 @@ function random_note(){
         note = notes.get_random();
     }
     prev = note;
-    clear();
-    print(note.name);
+    show_prompt(note.name, [note_to_vexkey(note)]);
 }
 
-function note_callback(e){
-    [type, key, intensity] = e.data;
-
-    // should be only if event is a notedown
-    // and if the notes_down container has that note exclusively ?
-    if (note.number % 12 == key % 12){
-        green_key(key);
-    }
-
-    if (type == KEYUP && key % 12 == note.number % 12){
-        unlight_key(key);
-        random_note();
-    }
-}
+const note_callback = make_single_note_callback(() => note.number % 12, random_note);
 
 function init_note(){
     canvas.style.display = 'none';
     init_quiz(random_note, note_callback);
 }
 
-add_game_button('notes', init_note);
+add_game_button('Notes', init_note, 'menu_base_notes', 'teal');

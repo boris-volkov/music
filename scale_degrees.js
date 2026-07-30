@@ -22,22 +22,11 @@ function random_scale_degree(){
     cprint ( ordinal[index] + ' note of ' + scale_base.name + ' ' + scale.name);
 }
 
-function scale_degree_callback(event){
-    [type, key, intensity] = event.data;
-
-    if (key % 12 == note_to_guess){
-        green_key(key);    
-    }
-
-    if (type == KEYUP && key % 12 == note_to_guess){
-        unlight_key(key);
-        random_scale_degree();
-    }
-}
+const scale_degree_callback = make_single_note_callback(() => note_to_guess, random_scale_degree);
 
 function init_scale_degree(){
     canvas.style.display = 'none';
     init_quiz(random_scale_degree, scale_degree_callback)
 }
 
-add_game_button('scale degrees', init_scale_degree);
+add_game_button('Scale Degrees', init_scale_degree, 'menu_chords_scales', 'clay');

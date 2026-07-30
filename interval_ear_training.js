@@ -1,5 +1,5 @@
 let EarInterval_kind, EarInterval_notes, EarInterval_base = null;
-let EarInterval_array, EarInterval_found;
+let EarInterval_array;
 let funcs;
 
 function random_EarInterval(){
@@ -19,29 +19,11 @@ function random_EarInterval(){
     EarInterval_array = addConstantModulo12(EarInterval_array, 0);
 }
 
-function EarInterval_callback(event){
-    [type, key, intensity] = event.data;
-    
-    EarInterval_held = [... new Set(addConstantModulo12(notes_down, 0))]
-    if (haveSameElements(addConstantModulo12(EarInterval_held, 0), EarInterval_array)){
-        EarInterval_held.forEach((note) => {
-            green_key(note);
-        });
-        EarInterval_found = true;
-    }
-
-    if (type == KEYUP && EarInterval_found){ 
-        EarInterval_held.forEach((note) => {
-            unlight_key(note);
-        });
-        EarInterval_found = false;
-        setTimeout(random_EarInterval, 500);
-    }
-}
+const EarInterval_callback = make_chord_style_callback(() => EarInterval_array, random_EarInterval, 500);
 
 function init_EarInterval(){
     canvas.style.display = 'none';
     init_quiz(random_EarInterval, EarInterval_callback);
 }
 
-add_game_button('interval ear training', init_EarInterval);
+add_game_button('Listen & Identify', init_EarInterval, 'menu_intervals', 'clay');

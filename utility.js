@@ -3,18 +3,16 @@
 // furthermore there should probably be a class for the quiz itself that calls this 
 // function at init time. 
 function init_quiz(starter, callback){ // sending both funcs sucks becuase the callback calls the starter anyway
+    reset_display(); // clears any stale notation panel left over from a previous mode
     starter();
-    midi.inputs.forEach((entry) => {
-        entry.onmidimessage = (e) => { // add listener to all midi inputs
-          onMIDIMessage(e);
-          callback(e);
-      }
-  });
-} // this function should also set up a cleanup function 
+    current_quiz_callback = callback;
+    bindMidiInputs(); // safe even if midi isn't ready yet or no keyboard is plugged in
+} // this function should also set up a cleanup function
 
-function add_game_button(name, func){
+function add_game_button(name, func, panelId, colorClass){
   const button = document.createElement('button');
   button.textContent = name;
+  button.classList.add('topic_button', colorClass);
   button.addEventListener('pointerdown', function () {
       func();
 
@@ -26,7 +24,7 @@ function add_game_button(name, func){
       this.classList.add("active");
       optionsOff();
 });
-  const container = document.getElementById('game_choices');
+  const container = document.getElementById(panelId);
   container.appendChild(button);
 }
 

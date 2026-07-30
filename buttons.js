@@ -43,7 +43,7 @@ function optionsOn(){
 function optionsOff(){
     toggleButton.classList.remove("active");
     contentDiv.style.display = 'none';
-    terminal.style.display = 'block';
+    terminal.style.display = 'flex';
 }
 
 toggleButton.addEventListener('pointerdown', () => {
@@ -54,15 +54,8 @@ toggleButton.addEventListener('pointerdown', () => {
         canvas.style.display = 'none';
     } else {
         contentDiv.style.display = 'none';
-        terminal.style.display = 'block';
+        terminal.style.display = 'flex';
         canvas.style.display = prev_canvas_display;
     }
     toggleButton.classList.toggle("active");
 });
-
-// this next code can check and change the color properties of the page
-// const colorButton = document.getElementById('color_button')
-// colorButton.addEventListener('pointerdown', () => {
-//     document.documentElement.style.setProperty('--bg_color', '#321');
-//     console.log(document.documentElement.style.getPropertyValue('--bg_color'));
-// });

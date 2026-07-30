@@ -2,7 +2,7 @@ const canvas = document.querySelector('#visuals');
  canvas.width = 1000;
  canvas.height = 150;
 const ctx = canvas.getContext('2d'); 
-background = '#ABC';
+background = '#fff8ef';
 
 function clear_canvas() {
     mem = ctx.fillStyle;

@@ -1,191 +1,450 @@
+* {
+	box-sizing: border-box;
+}
+
 :root {
-	--bg_color: rgb(123, 134, 145);
+	--canvas: #f0ead8;
+	--panel: #fff8ef;
+	--line: #d4c5aa;
+	--ink: #2a2520;
+	--ink-deep: #1a1510;
+	--ink-soft: #7a6f5d;
+	--white-key: #e8dcc8;
+	--white-key-pressed: #d4c5aa;
+	--teal: #b8d4c8;
+	--teal-border: #9ec4b4;
+	--teal-bright: #a0d6b8;
+	--clay: #e8b5a0;
+	--clay-border: #d4a085;
+	--amber: #e8c468;
+	--terracotta: #d97a6c;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
 }
 
 body {
-	background-color: var(--bg_color);
-    display: flex;
-    justify-content: center;
-	letter-spacing: 1pt;
+	background: var(--canvas);
+	font-family: 'IBM Plex Sans', sans-serif;
+	color: var(--ink);
 }
 
-pre {
-	display : block;
-	border-width : 5px;
-	border-style : solid;
-	border-color : #123;
-	border-radius: 5px;
-	background-color: #123;
-	width : 100%;
-	min-height : 6vh;
-	padding-top : 2vw;
-	padding-bottom: 2vw;
-	font: 24px Courier;
-	letter-spacing : 2px;
-	color : white;
-	white-space: pre-wrap;
-	word-break: break-word;
-	cursor: text;
-	margin-top: 10px;
-	margin-bottom: 0px;
-	text-align: center;
-}
-
-div.choice_holder{
-	flex-direction: column;
-}
-
-
-div#choices{
-	width: 100%;
-	border-radius: 10px;
-	margin-top: 10px;
-	padding-top: 10px;
-	margin-bottom: 10px;
-	border: dashed;
-	border-color: #ABC;
-	flex-direction: column;
-}
-
-div#choices button{
-	margin: 0;
-	margin-right: 10px;
-	font-size: large;
-}
-
-div.selection_title{
-	font-family: 'Courier New', Courier, monospace;
-	font-size: larger;
-	font-weight: 900;
-}
-
-
-div#choices div.selection{
-	border-radius: 0px;
-	border-bottom: solid;
-	border-color: #ABC;
-	margin: 10px;
-	padding: 10px;
-	align-items:center;
-	flex-wrap: wrap;
-}
-
-div{
-    display: flex;
-    align-items: center;
-	border-radius: 20px;
-}
-
-div#outer{
-    flex-direction: column;
-	justify-content: center;
-}
-
-div#quiz{
-	width: 70vw;
-	flex-direction: column;
-	align-items: start; 
-}
-
-div#quiz_window{
-	flex-direction: row;
-	align-items: flex-start;
-}
-
-
-div#keyboard{
-	display: block;
-	width : 100%;
-	position : relative;
-}
-
-div#black_keys, div#white_keys{
-	position: absolute;
-	top: 0px;
-	width: 100%;
-}
-
-div#black_keys {
-	z-index: 2;
-}
-
-div.white, div.black, div.clear {  
-	display: inline-block;    
-	border-top-left-radius: 5%;
-  	border-top-right-radius: 5%;   
-	border-bottom-left-radius: 10%;
-	border-bottom-right-radius: 10%;
-}
-
-div.black, div.clear {
-	padding-bottom: 8vw;
-	width: 7vw;
-}
-
-div.white {
-	margin: 3px;
-	padding-bottom: 14vw;
-	width: 12vw;
-    background-color: #ABC;
-}
-
-div.black{
-    background-color: #123;
-	border: solid;
-	border-color: #123;
-}
-
-div.clear{
-	opacity: 0;
+button {
+	font-family: 'IBM Plex Sans', sans-serif;
+	border: none;
 }
 
 canvas {
 	width: 100%;
-	border-width : 5px;
-	border-style : solid;
-	border-color : #123;
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+	max-width: 100%;
+}
+
+#outer {
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+	padding: 20px;
+	gap: 20px;
+}
+
+/* Header */
+
+#header {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	padding-bottom: 12px;
+	border-bottom: 2px solid var(--line);
+}
+
+#header h1 {
+	margin: 0;
+	font-size: 28px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+#kicker {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--ink-soft);
+	letter-spacing: 0.05em;
+}
+
+#full_screen {
+	margin-left: auto;
+	align-self: center;
+	background: transparent;
+	border: 1px solid var(--line);
+	color: var(--ink-soft);
 	border-radius: 5px;
-	padding-left : 0 ;
-	padding-right : 0;
-	margin-left : auto;
-	margin-right : auto;
-	max-width: 90vw;
-	max-height: 90vh;
+	padding: 6px 10px;
+	font-size: 14px;
+	cursor: pointer;
+	transition: background 0.15s;
 }
 
-img {
-	display: none;
+#full_screen:hover {
+	background: var(--panel);
 }
 
-div#buttons {
+/* MIDI status bar */
+
+#midi_status {
+	padding: 8px 16px;
+	border-radius: 8px;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-align: center;
+	color: var(--ink);
+	background: var(--line);
+	transition: background 0.2s ease;
+}
+
+#midi_status.status-ok {
+	background: var(--teal-bright);
+}
+
+#midi_status.status-warn {
+	background: var(--amber);
+}
+
+#midi_status.status-error {
+	background: var(--terracotta);
+	color: var(--canvas);
+}
+
+/* Layout grid */
+
+#app_grid {
+	display: grid;
+	grid-template-columns: 1fr 2fr;
+	gap: 24px;
+	max-width: 1400px;
+	margin: 0 auto;
 	width: 100%;
-	justify-content: space-between;
+	flex: 1;
 }
 
-div#game_choices{
-	flex-direction: row;
+@media (max-width: 900px) {
+	#app_grid {
+		grid-template-columns: 1fr;
+	}
 }
 
-button {
-	border-radius: 10%;
-	font-family: 'Courier New', Courier, monospace;
-	font-weight: bold;
-	font-size: large;
-	letter-spacing: 1pt;
-	padding: 5px;
-	padding-right: 10px;
-	padding-left: 10px;
-	margin-right: 4px;
-	margin-left: 4px;
-	margin-top: 20px;
-	margin-bottom: 5px;
-	background-color: rgb(191, 208, 234);
+/* Left column */
+
+#left_column {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
 }
 
-button.active {
-	background-color: rgb(160, 214, 160);
+#instructions {
+	background: var(--ink);
+	color: var(--canvas);
+	padding: 16px;
+	border-radius: 8px;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 13px;
+	line-height: 1.6;
 }
 
-button:hover {
-	background-color: rgb(239, 229, 243);
+#instructions div {
+	opacity: 0.8;
+}
+
+#instructions div + div {
+	margin-top: 8px;
+}
+
+#game_choices {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.menu_panel {
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+}
+
+.menu_panel_header {
+	padding: 12px 16px;
+	border-bottom: 2px solid var(--line);
+	font-weight: 600;
+	font-size: 12px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+.menu_panel_body {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 12px;
+}
+
+.topic_button {
+	padding: 8px 12px;
+	border-radius: 5px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.topic_button.teal {
+	background: var(--teal);
+	border: 1px solid var(--teal-border);
+}
+
+.topic_button.teal:hover {
+	background: var(--teal-border);
+}
+
+.topic_button.clay {
+	background: var(--clay);
+	border: 1px solid var(--clay-border);
+}
+
+.topic_button.clay:hover {
+	background: var(--clay-border);
+}
+
+.topic_button.active {
+	background: var(--ink);
+	color: var(--canvas);
+	border-color: var(--ink);
+}
+
+#options_toggle {
+	margin-top: auto;
+	padding: 12px 16px;
+	background: var(--ink);
+	color: var(--canvas);
+	border-radius: 6px;
+	font-weight: 600;
+	font-size: 13px;
+	letter-spacing: 0.05em;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+#options_toggle:hover, #options_toggle.active {
+	background: var(--ink-deep);
+}
+
+/* Right column */
+
+#right_column {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+/* More-options panel (note/interval/chord/scale pickers) */
+
+div#choices {
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+	padding: 16px;
+	flex-direction: column;
+	gap: 16px;
+}
+
+div.choice_holder {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+div.selection_title {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+div#choices div.selection {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+div#choices button {
+	padding: 6px 10px;
+	border-radius: 5px;
+	border: 1px solid var(--line);
+	background: var(--canvas);
+	color: var(--ink);
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+div#choices button:hover {
+	background: var(--line);
+}
+
+div#choices button.active {
+	background: var(--ink);
+	color: var(--canvas);
+	border-color: var(--ink);
+}
+
+/* Display panel (was the plain terminal) */
+
+pre#terminal {
+	background: var(--ink);
+	color: var(--canvas);
+	margin: 0;
+	padding: 20px;
+	border-radius: 8px;
+	min-height: 120px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 24px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-align: center;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+#notation_toggle {
+	align-self: flex-end;
+	padding: 6px 12px;
+	border-radius: 5px;
+	border: 1px solid var(--line);
+	background: var(--panel);
+	color: var(--ink);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+#notation_toggle:hover {
+	background: var(--line);
+}
+
+#notation_toggle.active {
+	background: var(--ink);
+	color: var(--canvas);
+	border-color: var(--ink);
+}
+
+#notation_toggle:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+#notation {
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+	min-height: 120px;
+	padding: 12px;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Piano keyboard */
+
+div#keyboard {
+	position: relative;
+	width: 100%;
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+	padding: 12px;
+	display: block;
+}
+
+div#black_keys {
+	position: absolute;
+	top: 12px;
+	left: 12px;
+	right: 12px;
+	height: 178px;
+	z-index: 2;
+	pointer-events: none;
+}
+
+div.black {
+	position: absolute;
+	top: 0;
+	width: 8.5%;
+	height: 100%;
+	background: var(--ink);
+	border: 2px solid var(--ink-deep);
+	border-radius: 0 0 5px 5px;
+	cursor: pointer;
+	pointer-events: auto;
+	transition: background 0.1s;
+}
+
+div.black:active {
+	background: var(--ink-deep);
+}
+
+div.black.pressed {
+	background: var(--ink-deep);
+}
+
+div#white_keys {
+	display: flex;
+	gap: 3px;
+	position: relative;
+	z-index: 1;
+}
+
+div.white {
+	flex: 1;
+	background: var(--white-key);
+	border: 2px solid var(--line);
+	border-radius: 0 0 8px 8px;
+	min-height: 280px;
+	cursor: pointer;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	padding-bottom: 8px;
+	transition: background 0.1s;
+}
+
+div.white:active {
+	background: var(--white-key-pressed);
+}
+
+div.white.pressed {
+	background: var(--white-key-pressed);
+}
+
+div.white.correct, div.black.correct {
+	background: var(--teal-bright);
+}
+
+.key_label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ink-soft);
 }
