@@ -403,11 +403,11 @@ div.black {
 }
 
 div.black:active {
-	background: var(--ink-deep);
+	background: var(--amber);
 }
 
 div.black.pressed {
-	background: var(--ink-deep);
+	background: var(--amber);
 }
 
 div#white_keys {
