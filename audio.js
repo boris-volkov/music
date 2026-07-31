@@ -43,8 +43,9 @@ function play_tone(midiNumber, startTime, duration) {
     osc.stop(startTime + duration);
 }
 
-// plays each note in turn, overlapping slightly so consecutive notes still feel connected
-function play_notes_sequentially(midiNumbers, noteDuration = 1.0, gap = 0.5) {
+// plays each note in turn, with a brief silence between them so consecutive notes
+// stay distinct instead of blending into a chord
+function play_notes_sequentially(midiNumbers, noteDuration = 0.4, gap = 0.55) {
     const ctx = get_audio_context();
     const now = ctx.currentTime;
     midiNumbers.forEach((noteNumber, i) => {
