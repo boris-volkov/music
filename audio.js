@@ -23,24 +23,32 @@ function midi_to_frequency(midiNumber) {
 
 function play_tone(midiNumber, startTime, duration) {
     const ctx = get_audio_context();
-    const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = midi_to_frequency(midiNumber);
 
     const attack = 0.02;
     const release = 0.08;
-    const peak = 0.25;
+    const peak = 0.16; // lower than a single sine's peak since two voices now sum together
 
     gain.gain.setValueAtTime(0, startTime);
     gain.gain.linearRampToValueAtTime(peak, startTime + attack);
     gain.gain.setValueAtTime(peak, startTime + duration - release);
     gain.gain.linearRampToValueAtTime(0, startTime + duration);
-
-    osc.connect(gain);
     gain.connect(ctx.destination);
-    osc.start(startTime);
-    osc.stop(startTime + duration);
+
+    // two sine voices a few cents apart give the note some shimmer/grit -- like a
+    // chorus effect -- without adding the extra harmonics a richer waveform would,
+    // which is what made two overlapping notes clash before. the detune is small
+    // enough that it doesn't add any audible roughness of its own.
+    const baseFreq = midi_to_frequency(midiNumber);
+    const detune_cents = 6;
+    [-detune_cents, detune_cents].forEach((cents) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = baseFreq * Math.pow(2, cents / 1200);
+        osc.connect(gain);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+    });
 }
 
 // plays each note in turn, overlapping slightly so consecutive notes still feel connected
