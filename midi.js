@@ -27,13 +27,27 @@ function onMIDIFailure(msg) {
   set_midi_status('MIDI access was denied — allow MIDI access and reload the page.', 'error');
 }
 
+function is_passthrough_port(name) { // ALSA's virtual "Midi Through" loopback shows up on ~every Linux system
+  return /midi\s*through/i.test(name || ''); // even with no real keyboard plugged in - it never carries key presses
+}
+
 function refresh_midi_status() {
   if (!midi) return;
-  if (midi.inputs.size === 0) {
+  const inputs = [...midi.inputs.values()];
+  if (inputs.length === 0) {
     set_midi_status('No MIDI keyboard detected — plug one in to start practicing.', 'warn');
     return;
   }
-  const names = [...midi.inputs.values()].map((input) => input.name).join(', ');
+  const real_inputs = inputs.filter((input) => !is_passthrough_port(input.name));
+  if (real_inputs.length === 0) {
+    set_midi_status(
+      'Only a virtual "Midi Through" port was found — your keyboard isn\'t reaching the browser ' +
+      '(check ALSA MIDI routing, e.g. aconnect, or the browser\'s MIDI device permissions).',
+      'warn'
+    );
+    return;
+  }
+  const names = real_inputs.map((input) => input.name).join(', ');
   set_midi_status(`Connected: ${names}`, 'ok');
 }
 
@@ -62,6 +76,7 @@ function logMidi(event){
   for (const character of event.data) {
     str += `0x${character.toString(16)} `;
   }
+  console.log(str);
 }
 
 function init(midiAccess) {
@@ -79,12 +94,12 @@ function init(midiAccess) {
 function onMIDIMessage(event) { // default function to run on each keypress
   const [type, key, intensity] = event.data;
 
-  if (type == KEYDOWN){ 
-    notes_down.push(key); 
+  if (type == KEYDOWN && intensity > 0){
+    notes_down.push(key);
     last_note_time = Date.now();
     light_key(key);
 
-  } else if (type == KEYUP) {
+  } else if (type == KEYUP || (type == KEYDOWN && intensity === 0)) { // many keyboards send Note On/velocity 0 instead of a real Note Off
     remove_item(notes_down, key);
     unlight_key(key);
   }
@@ -95,6 +110,7 @@ function bindMidiInputs() { // (re)attaches the message handler to every current
     if (!midi) return;
     midi.inputs.forEach((entry) => {
         entry.onmidimessage = (e) => {
+            logMidi(e); // always visible in devtools, so a silent keyboard vs. a silent game is easy to tell apart
             onMIDIMessage(e);
             if (current_quiz_callback) current_quiz_callback(e);
         };
