@@ -306,6 +306,54 @@ div#choices button.active {
 	border-color: var(--ink);
 }
 
+div#choices div.selection.sound_settings {
+	flex-direction: column;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	gap: 10px;
+}
+
+div.sound_settings label {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 13px;
+	color: var(--ink);
+}
+
+div.sound_settings .control_label {
+	min-width: 90px;
+	flex-shrink: 0;
+}
+
+div.sound_settings input[type="range"] {
+	flex: 1;
+}
+
+div.sound_settings select {
+	padding: 4px 8px;
+	border-radius: 5px;
+	border: 1px solid var(--line);
+	background: var(--canvas);
+	color: var(--ink);
+	font-family: 'IBM Plex Sans', sans-serif;
+	font-size: 13px;
+}
+
+div.sound_settings .value_readout {
+	min-width: 44px;
+	text-align: right;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 12px;
+	color: var(--ink-soft);
+}
+
+div.sound_preview_buttons {
+	display: flex;
+	gap: 8px;
+	margin-top: 4px;
+}
+
 /* Display panel (was the plain terminal) */
 
 pre#terminal {

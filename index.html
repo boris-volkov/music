@@ -61,6 +61,54 @@
                         <div class="selection_title">scales and modes</div>
                         <div id = "scale_types" class="selection"></div>
                     </div>
+                    <div class="choice_holder">
+                        <div class="selection_title">sound</div>
+                        <div class="selection sound_settings">
+                            <label>
+                                <span class="control_label">Waveform</span>
+                                <select id = "synth_waveform">
+                                    <option value="sine" selected>Sine</option>
+                                    <option value="triangle">Triangle</option>
+                                    <option value="sawtooth">Sawtooth</option>
+                                    <option value="square">Square</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span class="control_label">Detune</span>
+                                <input type="range" id = "synth_detune" min="0" max="30" step="1" value="6">
+                                <span class="value_readout" id = "synth_detune_value">6&cent;</span>
+                            </label>
+                            <label>
+                                <span class="control_label">Attack</span>
+                                <input type="range" id = "synth_attack" min="0" max="200" step="5" value="20">
+                                <span class="value_readout" id = "synth_attack_value">20ms</span>
+                            </label>
+                            <label>
+                                <span class="control_label">Release</span>
+                                <input type="range" id = "synth_release" min="10" max="400" step="10" value="80">
+                                <span class="value_readout" id = "synth_release_value">80ms</span>
+                            </label>
+                            <label>
+                                <span class="control_label">Volume</span>
+                                <input type="range" id = "synth_volume" min="0" max="50" step="1" value="16">
+                                <span class="value_readout" id = "synth_volume_value">16%</span>
+                            </label>
+                            <label>
+                                <span class="control_label">Note length</span>
+                                <input type="range" id = "synth_duration" min="0.1" max="2" step="0.1" value="1.0">
+                                <span class="value_readout" id = "synth_duration_value">1.0s</span>
+                            </label>
+                            <label>
+                                <span class="control_label">Gap</span>
+                                <input type="range" id = "synth_gap" min="0.1" max="2" step="0.1" value="0.5">
+                                <span class="value_readout" id = "synth_gap_value">0.5s</span>
+                            </label>
+                            <div class="sound_preview_buttons">
+                                <button id = "synth_preview_note">&#9658; note</button>
+                                <button id = "synth_preview_interval">&#9658; interval</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <button id = "notation_toggle" title="Toggle musical notation">&#9834; Notation</button>
                 <pre id = "terminal">Select a topic to begin.</pre>
@@ -93,6 +141,7 @@
     <script src = "midi.js"         ></script>
     <script src = "keyboard_input.js"></script>
     <script src = "audio.js"        ></script>
+    <script src = "synth_controls.js"></script>
     <script src = "terminal.js"     ></script>
     <script src = "theory.js"       ></script>
     <script src = "quiz_helpers.js" ></script>
