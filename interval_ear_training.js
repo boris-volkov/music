@@ -1,6 +1,5 @@
 let EarInterval_kind, EarInterval_notes, EarInterval_base = null;
 let EarInterval_array;
-let funcs;
 
 function random_EarInterval(){
     if ( (EarInterval_base = notes.get_random()) == null) return;
@@ -8,13 +7,7 @@ function random_EarInterval(){
     EarInterval_kind = EarInterval.name;
     EarInterval_notes = EarInterval.notes;
     EarInterval_array = EarInterval_notes.map( (note) => (note + EarInterval_base.number + 12*4));
-    console.log(EarInterval_array);
-    funcs = [];
-    EarInterval_array.forEach( (note) => {
-        const msg = new MidiMessage(KEYDOWN, note, 70);
-        funcs.push(msg.send.bind(msg));
-    });
-    sequentially(funcs, 500);
+    play_notes_sequentially(EarInterval_array);
     cprint("first note: " + EarInterval_base.name);
     EarInterval_array = addConstantModulo12(EarInterval_array, 0);
 }
