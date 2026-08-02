@@ -59,18 +59,43 @@ function render_notation(vexKeys) {
     VF.Formatter.FormatAndDraw(context, stave, [staveNote]);
 }
 
+// Exactly one display surface is visible at a time. Tracking which one is active means
+// closing the options panel can restore whatever the current mode was showing, instead
+// of always snapping back to the terminal.
+const display_surfaces = {
+    terminal: terminal,
+    notation: notation_panel,
+    rhythm: document.getElementById('rhythm_panel'),
+};
+let active_display = 'terminal';
+
+function show_display(which) {
+    active_display = which;
+    Object.entries(display_surfaces).forEach(([name, el]) => {
+        if (el) el.style.display = name === which ? 'flex' : 'none';
+    });
+}
+
+function hide_all_displays() { // while the options panel has the floor
+    Object.values(display_surfaces).forEach((el) => {
+        if (el) el.style.display = 'none';
+    });
+}
+
+function restore_display() {
+    show_display(active_display);
+}
+
 function reset_display() { // called on every quiz-mode switch so a stale panel never lingers
-    notation_panel.style.display = 'none';
-    terminal.style.display = 'flex';
+    show_display('terminal');
 }
 
 function show_prompt(text, vexKeys) {
     if (notation_enabled && vexflow_available && vexKeys && vexKeys.length) {
-        terminal.style.display = 'none';
-        notation_panel.style.display = 'flex';
+        show_display('notation');
         render_notation(vexKeys);
     } else {
-        reset_display();
+        show_display('terminal');
         cprint(text);
     }
 }

@@ -40,6 +40,10 @@
                         <div class="menu_panel_header">Chords &amp; Scales</div>
                         <div class="menu_panel_body" id = "menu_chords_scales"></div>
                     </div>
+                    <div class="menu_panel">
+                        <div class="menu_panel_header">Timing</div>
+                        <div class="menu_panel_body" id = "menu_rhythm"></div>
+                    </div>
                 </div>
                 <button id = "options_toggle">&#9881; MORE OPTIONS</button>
             </div>
@@ -113,6 +117,39 @@
                 <button id = "notation_toggle" title="Toggle musical notation">&#9834; Notation</button>
                 <pre id = "terminal">Select a topic to begin.</pre>
                 <div id = "notation" style="display: none"></div>
+                <div id = "rhythm_panel" style="display: none">
+                    <div id = "rhythm_controls">
+                        <button id = "rhythm_start">&#9658; START</button>
+                        <label>
+                            <span class="control_label">Tempo</span>
+                            <input type="range" id = "rhythm_tempo" min="40" max="160" step="5" value="80">
+                            <span class="value_readout" id = "rhythm_tempo_value">80 bpm</span>
+                        </label>
+                        <label>
+                            <span class="control_label">Notes</span>
+                            <select id = "rhythm_vocabulary">
+                                <option value="quarters">Quarters</option>
+                                <option value="eighths" selected>Eighths</option>
+                                <option value="sixteenths">Sixteenths</option>
+                            </select>
+                        </label>
+                        <label class="checkbox_label">
+                            <input type="checkbox" id = "rhythm_rests" checked>
+                            <span class="control_label">Rests</span>
+                        </label>
+                        <label class="checkbox_label">
+                            <input type="checkbox" id = "rhythm_metronome" checked>
+                            <span class="control_label">Metronome</span>
+                        </label>
+                    </div>
+                    <div id = "rhythm_stage">
+                        <div id = "rhythm_score"></div>
+                        <div id = "rhythm_overlay">
+                            <div id = "rhythm_playhead" style="display: none"></div>
+                        </div>
+                    </div>
+                    <div id = "rhythm_feedback"></div>
+                </div>
                 <canvas id	= "visuals" style="display: none"></canvas>
                 <div id = "keyboard">
                     <div id = "black_keys">
@@ -152,6 +189,7 @@
     <script src = "chord_quiz.js"   ></script>
     <script src = "scale_quiz.js"   ></script>
     <script src = "scale_degrees.js"></script>
+    <script src = "rhythm.js"       ></script>
     <script src = "buttons.js"      ></script>
     <script src = "interval_ear_training.js"></script>
 

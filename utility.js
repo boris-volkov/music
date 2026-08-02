@@ -2,12 +2,16 @@
 // maybe should prime with a false answer like my math game
 // furthermore there should probably be a class for the quiz itself that calls this 
 // function at init time. 
-function init_quiz(starter, callback){ // sending both funcs sucks becuase the callback calls the starter anyway
+let current_quiz_cleanup = null; // lets a mode stop timers/audio when the user switches away
+
+function init_quiz(starter, callback, cleanup = null){ // sending both funcs sucks becuase the callback calls the starter anyway
+    if (current_quiz_cleanup) current_quiz_cleanup();
+    current_quiz_cleanup = cleanup;
     reset_display(); // clears any stale notation panel left over from a previous mode
     starter();
     current_quiz_callback = callback;
     bindMidiInputs(); // safe even if midi isn't ready yet or no keyboard is plugged in
-} // this function should also set up a cleanup function
+}
 
 function add_game_button(name, func, panelId, colorClass){
   const button = document.createElement('button');

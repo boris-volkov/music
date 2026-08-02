@@ -43,18 +43,18 @@ function optionsOn(){
 function optionsOff(){
     toggleButton.classList.remove("active");
     contentDiv.style.display = 'none';
-    terminal.style.display = 'flex';
+    restore_display(); // back to whatever the active mode was showing, not always the terminal
 }
 
 toggleButton.addEventListener('pointerdown', () => {
     if (contentDiv.style.display === 'none'){
         contentDiv.style.display = 'flex';
-        terminal.style.display = 'none';
+        hide_all_displays();
         prev_canvas_display = canvas.style.display;
         canvas.style.display = 'none';
     } else {
         contentDiv.style.display = 'none';
-        terminal.style.display = 'flex';
+        restore_display();
         canvas.style.display = prev_canvas_display;
     }
     toggleButton.classList.toggle("active");

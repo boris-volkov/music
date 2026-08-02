@@ -4,7 +4,10 @@
     {
       "name": "music-theory",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8420"],
+      "runtimeArgs": [
+        "-c",
+        "import http.server\nclass H(http.server.SimpleHTTPRequestHandler):\n    def end_headers(self):\n        self.send_header('Cache-Control', 'no-store, must-revalidate')\n        super().end_headers()\nhttp.server.test(HandlerClass=H, port=8420, bind='127.0.0.1')\n"
+      ],
       "port": 8420
     }
   ]

@@ -64,6 +64,28 @@ function play_tone(midiNumber, startTime, duration) {
     });
 }
 
+// short percussive blip for the rhythm trainer's metronome. deliberately not routed
+// through synth_settings -- the click should stay crisp and audible no matter how the
+// note tone is currently tuned, so it can't be lost against the notes being played.
+function play_click(startTime, accent = false) {
+    const ctx = get_audio_context();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const duration = 0.035;
+
+    osc.type = 'square';
+    osc.frequency.value = accent ? 1600 : 1050; // downbeat sits higher so it's countable
+
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(accent ? 0.22 : 0.13, startTime + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+}
+
 // plays each note in turn, overlapping slightly so consecutive notes still feel connected
 function play_notes_sequentially(midiNumbers, noteDuration = synth_settings.note_duration, gap = synth_settings.gap) {
     const ctx = get_audio_context();

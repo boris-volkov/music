@@ -415,6 +415,150 @@ pre#terminal {
 	justify-content: center;
 }
 
+/* Rhythm trainer */
+
+#rhythm_panel {
+	flex-direction: column;
+	gap: 12px;
+	align-items: stretch;
+}
+
+#rhythm_controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 16px;
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+	padding: 12px 16px;
+}
+
+#rhythm_controls label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+}
+
+#rhythm_controls label.checkbox_label {
+	gap: 6px;
+}
+
+#rhythm_controls .control_label {
+	color: var(--ink);
+	min-width: auto;
+}
+
+#rhythm_controls select {
+	padding: 4px 8px;
+	border-radius: 5px;
+	border: 1px solid var(--line);
+	background: var(--canvas);
+	color: var(--ink);
+	font-family: 'IBM Plex Sans', sans-serif;
+	font-size: 13px;
+}
+
+#rhythm_controls .value_readout {
+	min-width: 58px;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 12px;
+	color: var(--ink-soft);
+}
+
+#rhythm_start {
+	padding: 8px 16px;
+	border-radius: 6px;
+	background: var(--ink);
+	color: var(--canvas);
+	font-weight: 600;
+	font-size: 13px;
+	letter-spacing: 0.05em;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+#rhythm_start:hover:not(:disabled) {
+	background: var(--ink-deep);
+}
+
+#rhythm_start:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+#rhythm_stage {
+	position: relative;
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+	padding: 0;
+	display: block;
+	overflow: hidden;
+}
+
+#rhythm_score {
+	display: block;
+	width: 100%;
+}
+
+#rhythm_overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	display: block;
+}
+
+#rhythm_playhead {
+	position: absolute;
+	top: 8px;
+	bottom: 8px;
+	width: 2px;
+	background: var(--terracotta);
+	opacity: 0.85;
+}
+
+/* one tick per tap, sitting above the staff so it never covers the notes */
+.rhythm_stamp {
+	position: absolute;
+	top: 12px;
+	width: 3px;
+	height: 26px;
+	border-radius: 2px;
+	transform: translateX(-1px);
+}
+
+.rhythm_stamp.perfect {
+	background: #2a7a3f;
+}
+
+.rhythm_stamp.good {
+	background: var(--amber);
+}
+
+.rhythm_stamp.off {
+	background: var(--terracotta);
+}
+
+#rhythm_feedback {
+	justify-content: center;
+	min-height: 28px;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--ink-soft);
+	text-align: center;
+}
+
+#rhythm_feedback.passed {
+	color: #2a7a3f;
+}
+
+#rhythm_feedback.failed {
+	color: var(--terracotta);
+}
+
 /* Piano keyboard */
 
 div#keyboard {
