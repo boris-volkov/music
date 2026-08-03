@@ -46,6 +46,7 @@ const VOCABULARY = {
 
 let current_rhythm = null;
 let rhythm_staves = [];
+let rhythm_domains = []; // per measure: the {start, end} x-range one measure of time spans
 let rhythm_hits = [];        // beat positions of the player's taps this run
 let rhythm_run_start = null; // audio-clock time that beat 0 lands on
 let rhythm_running = false;
@@ -99,48 +100,76 @@ function generate_rhythm() {
 
 // --- rendering ----------------------------------------------------------------
 
+// A stave reserves space at its left for the barline, and more if it carries a clef or
+// time signature, so its note area starts inset from its own x. Measuring that inset up
+// front lets each stave be widened by exactly its own overhead, which makes every
+// measure's note area come out the same width and butt directly against the next one.
+function stave_overhead(withClef, withTimeSignature) {
+    const probe = new Vex.Flow.Stave(0, 0, 200);
+    if (withClef) probe.addClef('percussion');
+    if (withTimeSignature) probe.addTimeSignature('4/4');
+    return probe.getNoteStartX() - probe.getX();
+}
+
 function render_rhythm_score() {
     const VF = Vex.Flow;
     rhythm_score.innerHTML = '';
 
     const measureCount = current_rhythm.measures.length;
-    const lines = Math.ceil(measureCount / MEASURES_PER_LINE);
-    // a run shorter than one line stretches to fill it rather than leaving dead space
-    const perLine = Math.min(measureCount, MEASURES_PER_LINE);
+    const lineCount = Math.ceil(measureCount / MEASURES_PER_LINE);
 
     const width = rhythm_score.clientWidth || 880;
     const renderer = new VF.Renderer(rhythm_score, VF.Renderer.Backends.SVG);
-    renderer.resize(width, FIRST_LINE_TOP + lines * LINE_HEIGHT);
+    renderer.resize(width, FIRST_LINE_TOP + lineCount * LINE_HEIGHT);
     const context = renderer.getContext();
 
-    const staveWidth = (width - SCORE_MARGIN * 2) / perLine;
+    const usable = width - SCORE_MARGIN * 2;
     rhythm_staves = [];
+    rhythm_domains = [];
 
-    current_rhythm.measures.forEach((measure, mi) => {
-        const line = Math.floor(mi / MEASURES_PER_LINE);
-        const column = mi % MEASURES_PER_LINE;
-        const stave = new VF.Stave(
-            SCORE_MARGIN + column * staveWidth,
-            FIRST_LINE_TOP + line * LINE_HEIGHT,
-            staveWidth
-        );
-        if (column === 0) stave.addClef('percussion'); // clef repeats on each new line
-        if (mi === 0) stave.addTimeSignature('4/4');
-        stave.setContext(context).draw();
-        rhythm_staves.push(stave);
+    for (let line = 0; line < lineCount; line++) {
+        const firstIndex = line * MEASURES_PER_LINE;
+        const count = Math.min(MEASURES_PER_LINE, measureCount - firstIndex);
+        const leadOverhead = stave_overhead(true, line === 0);
+        const plainOverhead = stave_overhead(false, false);
 
-        const staveNotes = measure.map((note) => new VF.StaveNote({
-            keys: ['b/4'], // rhythm-only notation: every note sits on the middle line
-            duration: note.rest ? note.duration + 'r' : note.duration,
-            stem_direction: 1,
-        }));
+        // every measure gets an identical note-area width, so the playhead keeps one
+        // constant speed across the whole line and no gap opens up at the barlines
+        const noteAreaWidth = (usable - leadOverhead) / count;
 
-        const beams = VF.Beam.generateBeams(staveNotes);
-        VF.Formatter.FormatAndDraw(context, stave, staveNotes);
-        beams.forEach((beam) => beam.setContext(context).draw());
+        let x = SCORE_MARGIN;
+        for (let column = 0; column < count; column++) {
+            const mi = firstIndex + column;
+            let staveWidth;
+            if (count === 1) staveWidth = usable;
+            else if (column === 0) staveWidth = noteAreaWidth + leadOverhead - plainOverhead;
+            else if (column === count - 1) staveWidth = noteAreaWidth + plainOverhead;
+            else staveWidth = noteAreaWidth;
 
-        draw_timing_strip(stave);
-    });
+            const stave = new VF.Stave(x, FIRST_LINE_TOP + line * LINE_HEIGHT, staveWidth);
+            if (column === 0) stave.addClef('percussion'); // clef repeats on each new line
+            if (mi === 0) stave.addTimeSignature('4/4');
+            stave.setContext(context).draw();
+            rhythm_staves.push(stave);
+
+            const start = stave.getNoteStartX();
+            rhythm_domains.push({ start, end: start + noteAreaWidth });
+
+            const staveNotes = current_rhythm.measures[mi].map((note) => new VF.StaveNote({
+                keys: ['b/4'], // rhythm-only notation: every note sits on the middle line
+                duration: note.rest ? note.duration + 'r' : note.duration,
+                stem_direction: 1,
+            }));
+
+            const beams = VF.Beam.generateBeams(staveNotes);
+            VF.Formatter.FormatAndDraw(context, stave, staveNotes);
+            beams.forEach((beam) => beam.setContext(context).draw());
+
+            x += staveWidth;
+        }
+    }
+
+    draw_timing_strips();
 }
 
 // The strip above each staff is where timing is actually read. Engraved notation spaces
@@ -156,34 +185,43 @@ function svg_element(tag, attributes) {
     return el;
 }
 
-function draw_timing_strip(stave) {
+// One unbroken rectangle per line, since the measures' note areas now butt together --
+// the playhead crosses a barline without a gap to jump.
+function draw_timing_strips() {
     const svg = rhythm_score.querySelector('svg');
-    const group = svg_element('g', { class: 'rhythm_grid' });
-
-    const startX = stave.getNoteStartX();
-    const endX = stave.getX() + stave.getWidth();
-    const bottomY = stave.getYForLine(0) - STRIP_BASE_OFFSET;
-    const topY = bottomY - STRIP_HEIGHT;
-
-    group.appendChild(svg_element('rect', {
-        x: startX, y: topY, width: endX - startX, height: STRIP_HEIGHT,
-        fill: 'none', stroke: '#d4c5aa', 'stroke-width': 1,
-    }));
-
-    // internal divisions only -- the first and last would sit on the rectangle's own edges
     const perBeat = SUBDIVISIONS_PER_BEAT[rhythm_settings.vocabulary];
     const steps = BEATS_PER_MEASURE * perBeat;
-    for (let s = 1; s < steps; s++) {
-        const onBeat = s % perBeat === 0;
-        const x = startX + (s / steps) * (endX - startX);
-        group.appendChild(svg_element('line', {
-            x1: x, y1: topY, x2: x, y2: bottomY,
-            stroke: onBeat ? '#7a6f5d' : '#d4c5aa',
-            'stroke-width': onBeat ? 1.5 : 1,
-        }));
-    }
+    const lineCount = Math.ceil(rhythm_staves.length / MEASURES_PER_LINE);
 
-    svg.appendChild(group);
+    for (let line = 0; line < lineCount; line++) {
+        const firstIndex = line * MEASURES_PER_LINE;
+        const lastIndex = Math.min(firstIndex + MEASURES_PER_LINE, rhythm_staves.length) - 1;
+        const bottomY = rhythm_staves[firstIndex].getYForLine(0) - STRIP_BASE_OFFSET;
+        const topY = bottomY - STRIP_HEIGHT;
+        const left = rhythm_domains[firstIndex].start;
+        const right = rhythm_domains[lastIndex].end;
+
+        const group = svg_element('g', { class: 'rhythm_grid' });
+        group.appendChild(svg_element('rect', {
+            x: left, y: topY, width: right - left, height: STRIP_HEIGHT,
+            fill: 'none', stroke: '#d4c5aa', 'stroke-width': 1,
+        }));
+
+        for (let mi = firstIndex; mi <= lastIndex; mi++) {
+            const { start, end } = rhythm_domains[mi];
+            // skip step 0 of the opening measure -- it is the rectangle's own left edge
+            for (let s = (mi === firstIndex ? 1 : 0); s < steps; s++) {
+                const onBeat = s % perBeat === 0; // barlines land here too, same weight
+                group.appendChild(svg_element('line', {
+                    x1: start + (s / steps) * (end - start), y1: topY,
+                    x2: start + (s / steps) * (end - start), y2: bottomY,
+                    stroke: onBeat ? '#7a6f5d' : '#d4c5aa',
+                    'stroke-width': onBeat ? 1.5 : 1,
+                }));
+            }
+        }
+        svg.appendChild(group);
+    }
 }
 
 // maps a position in beats to a point on the score. x is linear in time so the playhead
@@ -194,12 +232,11 @@ function beat_to_position(beat) {
     const clamped = Math.max(0, Math.min(beat, total_beats()));
     const mi = Math.min(rhythm_staves.length - 1, Math.floor(clamped / BEATS_PER_MEASURE));
     const stave = rhythm_staves[mi];
-    const startX = stave.getNoteStartX();
-    const endX = stave.getX() + stave.getWidth();
+    const { start, end } = rhythm_domains[mi];
     const withinMeasure = (clamped - mi * BEATS_PER_MEASURE) / BEATS_PER_MEASURE;
     const top = stave.getYForLine(0);
     return {
-        x: startX + withinMeasure * (endX - startX),
+        x: start + withinMeasure * (end - start),
         top,
         bottom: stave.getYForLine(4),
         stripTop: top - STRIP_BASE_OFFSET - STRIP_HEIGHT,
