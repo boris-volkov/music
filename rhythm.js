@@ -44,6 +44,7 @@ const VOCABULARY = {
 
 let current_rhythm = null;
 let rhythm_staves = [];
+let rhythm_anchors = []; // per measure: {beat, x} of each rendered note, + the barline
 let rhythm_hits = [];        // beat positions of the player's taps this run
 let rhythm_run_start = null; // audio-clock time that beat 0 lands on
 let rhythm_running = false;
@@ -113,6 +114,7 @@ function render_rhythm_score() {
 
     const staveWidth = (width - SCORE_MARGIN * 2) / perLine;
     rhythm_staves = [];
+    rhythm_anchors = [];
 
     current_rhythm.measures.forEach((measure, mi) => {
         const line = Math.floor(mi / MEASURES_PER_LINE);
@@ -136,21 +138,39 @@ function render_rhythm_score() {
         const beams = VF.Beam.generateBeams(staveNotes);
         VF.Formatter.FormatAndDraw(context, stave, staveNotes);
         beams.forEach((beam) => beam.setContext(context).draw());
+
+        // Record where each note actually ended up. VexFlow spaces notes by engraving
+        // convention, not linearly in time (a half note gets well under twice a
+        // quarter's width), so beat position can't be derived from the measure's
+        // geometry -- it has to be read back off the formatted notes.
+        const anchors = measure.map((note, i) => ({
+            beat: note.startBeat,
+            x: staveNotes[i].getStemX(),
+        }));
+        anchors.push({ beat: (mi + 1) * BEATS_PER_MEASURE, x: stave.getX() + stave.getWidth() });
+        rhythm_anchors.push(anchors);
     });
 }
 
-// maps a position in beats to a point on the score, interpolating linearly across each
-// measure's note area. y matters once the score wraps: the playhead has to drop to the
-// next system rather than run off the right edge.
+// maps a position in beats to a point on the score, interpolating between the real
+// rendered note positions so the playhead and stamps line up with the note stems.
+// y matters once the score wraps: the playhead has to drop to the next system rather
+// than run off the right edge.
 function beat_to_position(beat) {
     const clamped = Math.max(0, Math.min(beat, total_beats()));
     const mi = Math.min(rhythm_staves.length - 1, Math.floor(clamped / BEATS_PER_MEASURE));
     const stave = rhythm_staves[mi];
-    const startX = stave.getNoteStartX();
-    const endX = stave.getX() + stave.getWidth();
-    const withinMeasure = (clamped - mi * BEATS_PER_MEASURE) / BEATS_PER_MEASURE;
+    const anchors = rhythm_anchors[mi];
+
+    let i = 0; // last anchor at or before this beat, leaving room for a segment end
+    while (i < anchors.length - 2 && anchors[i + 1].beat <= clamped) i++;
+    const from = anchors[i];
+    const to = anchors[i + 1];
+    const span = to.beat - from.beat;
+    const t = span > 0 ? (clamped - from.beat) / span : 0;
+
     return {
-        x: startX + withinMeasure * (endX - startX),
+        x: from.x + t * (to.x - from.x),
         top: stave.getYForLine(0),
         bottom: stave.getYForLine(4),
     };
