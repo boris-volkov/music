@@ -13,8 +13,9 @@ const MEASURES_PER_LINE = 4;
 
 // score geometry, in px
 const SCORE_MARGIN = 10;
-const LINE_HEIGHT = 118;   // vertical distance from one system to the next
+const LINE_HEIGHT = 118;      // vertical distance from one system to the next
 const FIRST_LINE_TOP = 20;
+const STRIP_BASE_OFFSET = 14; // timing strip's baseline, above the staff's top line
 
 const rhythm_settings = {
     tempo: 80,
@@ -44,7 +45,6 @@ const VOCABULARY = {
 
 let current_rhythm = null;
 let rhythm_staves = [];
-let rhythm_anchors = []; // per measure: {beat, x} of each rendered note, + the barline
 let rhythm_hits = [];        // beat positions of the player's taps this run
 let rhythm_run_start = null; // audio-clock time that beat 0 lands on
 let rhythm_running = false;
@@ -114,7 +114,6 @@ function render_rhythm_score() {
 
     const staveWidth = (width - SCORE_MARGIN * 2) / perLine;
     rhythm_staves = [];
-    rhythm_anchors = [];
 
     current_rhythm.measures.forEach((measure, mi) => {
         const line = Math.floor(mi / MEASURES_PER_LINE);
@@ -139,40 +138,78 @@ function render_rhythm_score() {
         VF.Formatter.FormatAndDraw(context, stave, staveNotes);
         beams.forEach((beam) => beam.setContext(context).draw());
 
-        // Record where each note actually ended up. VexFlow spaces notes by engraving
-        // convention, not linearly in time (a half note gets well under twice a
-        // quarter's width), so beat position can't be derived from the measure's
-        // geometry -- it has to be read back off the formatted notes.
-        const anchors = measure.map((note, i) => ({
-            beat: note.startBeat,
-            x: staveNotes[i].getStemX(),
-        }));
-        anchors.push({ beat: (mi + 1) * BEATS_PER_MEASURE, x: stave.getX() + stave.getWidth() });
-        rhythm_anchors.push(anchors);
+        draw_timing_strip(stave, measure, mi);
     });
 }
 
-// maps a position in beats to a point on the score, interpolating between the real
-// rendered note positions so the playhead and stamps line up with the note stems.
-// y matters once the score wraps: the playhead has to drop to the next system rather
-// than run off the right edge.
+// The strip above each staff is where timing is actually read. Engraved notation spaces
+// notes by convention rather than by elapsed time, so the playhead can't both move at a
+// constant speed and sit on the note stems. The strip resolves that: it divides the
+// measure into even fractions of time, so the playhead sweeps smoothly across it and a
+// tap's mark can be compared against the grid line it was aiming for.
+const SUBDIVISIONS_PER_BEAT = { quarters: 1, eighths: 2, sixteenths: 4 };
+
+function svg_element(tag, attributes) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attributes).forEach(([k, v]) => el.setAttribute(k, v));
+    return el;
+}
+
+function draw_timing_strip(stave, measure, mi) {
+    const svg = rhythm_score.querySelector('svg');
+    const group = svg_element('g', { class: 'rhythm_grid' });
+
+    const startX = stave.getNoteStartX();
+    const endX = stave.getX() + stave.getWidth();
+    const baseY = stave.getYForLine(0) - STRIP_BASE_OFFSET;
+    const at = (beat) => startX + (beat / BEATS_PER_MEASURE) * (endX - startX);
+
+    group.appendChild(svg_element('line', {
+        x1: startX, y1: baseY, x2: endX, y2: baseY,
+        stroke: '#d4c5aa', 'stroke-width': 1,
+    }));
+
+    const perBeat = SUBDIVISIONS_PER_BEAT[rhythm_settings.vocabulary];
+    const steps = BEATS_PER_MEASURE * perBeat;
+    for (let s = 0; s < steps; s++) {
+        const onBeat = s % perBeat === 0;
+        const x = at(s / perBeat);
+        group.appendChild(svg_element('line', {
+            x1: x, y1: baseY, x2: x, y2: baseY - (onBeat ? 11 : 6),
+            stroke: onBeat ? '#7a6f5d' : '#d4c5aa',
+            'stroke-width': onBeat ? 1.5 : 1,
+        }));
+    }
+
+    // the targets: where each written note falls in pure proportional time
+    measure.forEach((note) => {
+        if (note.rest) return;
+        group.appendChild(svg_element('circle', {
+            cx: at(note.startBeat - mi * BEATS_PER_MEASURE),
+            cy: baseY, r: 2.6, fill: '#2a2520',
+        }));
+    });
+
+    svg.appendChild(group);
+}
+
+// maps a position in beats to a point on the score. x is linear in time so the playhead
+// sweeps at a constant speed -- it tracks the timing strip above the staff, not the
+// engraved note spacing. y matters once the score wraps: the playhead has to drop to the
+// next system rather than run off the right edge.
 function beat_to_position(beat) {
     const clamped = Math.max(0, Math.min(beat, total_beats()));
     const mi = Math.min(rhythm_staves.length - 1, Math.floor(clamped / BEATS_PER_MEASURE));
     const stave = rhythm_staves[mi];
-    const anchors = rhythm_anchors[mi];
-
-    let i = 0; // last anchor at or before this beat, leaving room for a segment end
-    while (i < anchors.length - 2 && anchors[i + 1].beat <= clamped) i++;
-    const from = anchors[i];
-    const to = anchors[i + 1];
-    const span = to.beat - from.beat;
-    const t = span > 0 ? (clamped - from.beat) / span : 0;
-
+    const startX = stave.getNoteStartX();
+    const endX = stave.getX() + stave.getWidth();
+    const withinMeasure = (clamped - mi * BEATS_PER_MEASURE) / BEATS_PER_MEASURE;
+    const top = stave.getYForLine(0);
     return {
-        x: from.x + t * (to.x - from.x),
-        top: stave.getYForLine(0),
+        x: startX + withinMeasure * (endX - startX),
+        top,
         bottom: stave.getYForLine(4),
+        strip: top - STRIP_BASE_OFFSET,
     };
 }
 
@@ -181,11 +218,12 @@ function clear_stamps() {
 }
 
 function stamp_hit(beat, accuracy) {
-    const { x, top } = beat_to_position(beat);
+    const { x, strip } = beat_to_position(beat);
     const stamp = document.createElement('div');
     stamp.className = `rhythm_stamp ${accuracy}`;
     stamp.style.left = `${x}px`;
-    stamp.style.top = `${top - 34}px`; // sits just above its own system's staff
+    // crosses its own system's strip baseline, so it reads against the grid behind it
+    stamp.style.top = `${strip - 13}px`;
     rhythm_overlay.appendChild(stamp);
 }
 
@@ -250,11 +288,13 @@ function animate_playhead() {
         return;
     }
 
-    const { x, top, bottom } = beat_to_position(beat);
+    // spans the timing strip and the staff together, tying the two representations
+    const { x, bottom, strip } = beat_to_position(beat);
+    const headTop = strip - 15;
     rhythm_playhead.style.display = 'block';
     rhythm_playhead.style.left = `${x}px`;
-    rhythm_playhead.style.top = `${top - 12}px`;
-    rhythm_playhead.style.height = `${bottom - top + 24}px`;
+    rhythm_playhead.style.top = `${headTop}px`;
+    rhythm_playhead.style.height = `${bottom + 10 - headTop}px`;
     if (beat < 0) rhythm_feedback.textContent = 'counting in…';
     else if (rhythm_feedback.textContent === 'counting in…') rhythm_feedback.textContent = 'go!';
 

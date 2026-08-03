@@ -519,11 +519,12 @@ pre#terminal {
 	opacity: 0.85;
 }
 
-/* one tick per tap, sitting above its own system's staff so it never covers the notes */
+/* one tick per tap, crossing its own system's timing strip so it can be read against
+   the proportional grid rather than against the engraved note spacing */
 .rhythm_stamp {
 	position: absolute;
 	width: 3px;
-	height: 26px;
+	height: 18px;
 	border-radius: 2px;
 	transform: translateX(-1px);
 }
