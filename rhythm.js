@@ -22,10 +22,16 @@ const rhythm_settings = {
     tempo: 80,
     measures: 4,
     source: 'generated', // 'generated' | 'bach'
+    melody: false,       // also require the written pitch, not just the timing
     vocabulary: 'eighths',
     rests: true,
     metronome: true,
 };
+
+// melodies only exist in the borrowed corpus, so melody mode implies a real passage
+function melodic() {
+    return rhythm_settings.melody && rhythm_settings.source === 'bach';
+}
 
 function total_beats() {
     return rhythm_settings.measures * BEATS_PER_MEASURE;
@@ -87,13 +93,17 @@ function generate_measure() {
 // walks the measures assigning each note its absolute beat, and collects the onsets the
 // player is expected to tap. also settles how finely the timing strip has to be divided:
 // the grid needs a line at every possible onset, which is the shortest value in use.
-function finish_rhythm(measures, attribution = null) {
+function finish_rhythm(measures, attribution = null, key = null) {
     const onsets = [];
+    const onsetPitches = []; // parallel to onsets; null when the passage has no pitches
     let beat = 0;
     measures.forEach((measure) => {
         measure.forEach((note) => {
             note.startBeat = beat;
-            if (!note.rest) onsets.push(beat);
+            if (!note.rest) {
+                onsets.push(beat);
+                onsetPitches.push(note.pitch ? pitch_to_midi(note.pitch) : null);
+            }
             beat += DURATION_BEATS[note.duration];
         });
     });
@@ -101,7 +111,7 @@ function finish_rhythm(measures, attribution = null) {
     const shortest = Math.min(...measures.flat().map((n) => DURATION_BEATS[n.duration]));
     const perBeat = Math.max(1, Math.round(1 / Math.min(shortest, 1)));
 
-    return { measures, onsets, perBeat, attribution };
+    return { measures, onsets, onsetPitches, perBeat, attribution, key };
 }
 
 function generate_rhythm() {
@@ -110,18 +120,35 @@ function generate_rhythm() {
     return finish_rhythm(measures);
 }
 
-// --- borrowed rhythms ---------------------------------------------------------
+// --- borrowed passages --------------------------------------------------------
 
-function parse_pattern(pattern) {
-    return pattern.split(' ').map((token) => ({
-        duration: token.endsWith('r') ? token.slice(0, -1) : token,
-        rest: token.endsWith('r'),
-    }));
+const PITCH_CLASS = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+
+// corpus notes are 'duration:pitch' ('q:f#4') or a bare rest ('8r')
+function parse_note(token) {
+    if (token.endsWith('r')) {
+        return { duration: token.slice(0, -1), rest: true };
+    }
+    const [duration, pitch] = token.split(':');
+    return { duration, rest: false, pitch };
+}
+
+// 'f#4' -> 'f#/4', the key format VexFlow wants
+function pitch_to_vexkey(pitch) {
+    return `${pitch.slice(0, -1)}/${pitch.slice(-1)}`;
+}
+
+function pitch_to_midi(pitch) {
+    const octave = parseInt(pitch.slice(-1), 10);
+    const body = pitch.slice(0, -1);
+    let semitones = PITCH_CLASS[body[0]];
+    for (const ch of body.slice(1)) semitones += ch === '#' ? 1 : -1;
+    return (octave + 1) * 12 + semitones;
 }
 
 // takes a contiguous window out of one real passage, rather than stitching together
-// bars from unrelated pieces -- the point is to practise rhythms that actually occur
-function bach_rhythm() {
+// bars from unrelated pieces -- the point is to practise music that actually occurs
+function bach_excerpt() {
     const wanted = rhythm_settings.measures;
     const candidates = BACH_EXCERPTS.filter((e) => e.m.length >= wanted);
     if (candidates.length === 0) return null;
@@ -130,9 +157,9 @@ function bach_rhythm() {
     const offset = Math.floor(Math.random() * (excerpt.m.length - wanted + 1));
     const measures = excerpt.m
         .slice(offset, offset + wanted)
-        .map((i) => parse_pattern(BACH_PATTERNS[i]));
+        .map((mi) => BACH_MEASURES[mi].map((ni) => parse_note(BACH_NOTES[ni])));
 
-    const [catalogue, title] = BACH_PIECES[excerpt.p];
+    const [catalogue, title, key] = BACH_PIECES[excerpt.p];
     const first = offset + 1;
     const bars = wanted === 1 ? `m. ${first}` : `mm. ${first}–${first + wanted - 1}`;
     // a handful of the source files carry no BWV number; their filename stem is no use
@@ -140,7 +167,7 @@ function bach_rhythm() {
     const parts = ['J.S. Bach'];
     if (/^BWV/.test(catalogue)) parts.push(catalogue);
     parts.push(`${bars}, soprano`);
-    return finish_rhythm(measures, { title, detail: parts.join(' · ') });
+    return finish_rhythm(measures, { title, detail: parts.join(' · ') }, key);
 }
 
 // --- rendering ----------------------------------------------------------------
@@ -149,9 +176,10 @@ function bach_rhythm() {
 // time signature, so its note area starts inset from its own x. Measuring that inset up
 // front lets each stave be widened by exactly its own overhead, which makes every
 // measure's note area come out the same width and butt directly against the next one.
-function stave_overhead(withClef, withTimeSignature) {
+function stave_overhead(withClef, withTimeSignature, keySignature) {
     const probe = new Vex.Flow.Stave(0, 0, 200);
-    if (withClef) probe.addClef('percussion');
+    if (withClef) probe.addClef(melodic() ? 'treble' : 'percussion');
+    if (keySignature) probe.addKeySignature(keySignature);
     if (withTimeSignature) probe.addTimeSignature('4/4');
     return probe.getNoteStartX() - probe.getX();
 }
@@ -175,8 +203,9 @@ function render_rhythm_score() {
     for (let line = 0; line < lineCount; line++) {
         const firstIndex = line * MEASURES_PER_LINE;
         const count = Math.min(MEASURES_PER_LINE, measureCount - firstIndex);
-        const leadOverhead = stave_overhead(true, line === 0);
-        const plainOverhead = stave_overhead(false, false);
+        const keySignature = melodic() ? current_rhythm.key : null;
+        const leadOverhead = stave_overhead(true, line === 0, keySignature);
+        const plainOverhead = stave_overhead(false, false, null);
 
         // every measure gets an identical note-area width, so the playhead keeps one
         // constant speed across the whole line and no gap opens up at the barlines
@@ -192,7 +221,10 @@ function render_rhythm_score() {
             else staveWidth = noteAreaWidth;
 
             const stave = new VF.Stave(x, FIRST_LINE_TOP + line * LINE_HEIGHT, staveWidth);
-            if (column === 0) stave.addClef('percussion'); // clef repeats on each new line
+            if (column === 0) { // clef and key signature repeat on each new line
+                stave.addClef(melodic() ? 'treble' : 'percussion');
+                if (keySignature) stave.addKeySignature(keySignature);
+            }
             if (mi === 0) stave.addTimeSignature('4/4');
             stave.setContext(context).draw();
             rhythm_staves.push(stave);
@@ -200,11 +232,24 @@ function render_rhythm_score() {
             const start = stave.getNoteStartX();
             rhythm_domains.push({ start, end: start + noteAreaWidth });
 
-            const staveNotes = current_rhythm.measures[mi].map((note) => new VF.StaveNote({
-                keys: ['b/4'], // rhythm-only notation: every note sits on the middle line
-                duration: note.rest ? note.duration + 'r' : note.duration,
-                stem_direction: 1,
-            }));
+            const staveNotes = current_rhythm.measures[mi].map((note) => {
+                const options = {
+                    // rhythm-only notation parks every note on the middle line; melody
+                    // mode puts it at its written pitch
+                    keys: [melodic() && note.pitch ? pitch_to_vexkey(note.pitch) : 'b/4'],
+                    duration: note.rest ? note.duration + 'r' : note.duration,
+                };
+                if (!melodic()) options.stem_direction = 1; // uniform stems read as a rhythm
+                return new VF.StaveNote(options);
+            });
+
+            if (melodic()) {
+                // lets VexFlow work out which accidentals actually need printing given
+                // the key signature and what has already appeared in the bar
+                const voice = new VF.Voice({ num_beats: BEATS_PER_MEASURE, beat_value: 4 });
+                voice.addTickables(staveNotes);
+                VF.Accidental.applyAccidentals([voice], keySignature);
+            }
 
             const beams = VF.Beam.generateBeams(staveNotes);
             VF.Formatter.FormatAndDraw(context, stave, staveNotes);
@@ -303,13 +348,26 @@ function stamp_hit(beat, accuracy) {
 }
 
 // how close this tap was to whichever note it's nearest -- drives the live stamp colour.
-// the strict, one-tap-per-note scoring happens at the end of the run in score_run().
-function accuracy_for(beat) {
-    const seconds = (b) => Math.abs(b - beat) * beat_duration();
-    const nearest = Math.min(...current_rhythm.onsets.map(seconds));
+// in melody mode only notes of the right pitch are candidates, so a wrong note reads as
+// off however well timed it was. the strict one-tap-per-note scoring happens at the end
+// of the run in score_run().
+function accuracy_for(beat, midi) {
+    const { onsets, onsetPitches } = current_rhythm;
+    let nearest = Infinity;
+    onsets.forEach((onset, i) => {
+        if (melodic() && !same_pitch_class(midi, onsetPitches[i])) return;
+        nearest = Math.min(nearest, Math.abs(onset - beat) * beat_duration());
+    });
     if (nearest <= PERFECT_WINDOW) return 'perfect';
     if (nearest <= GOOD_WINDOW) return 'good';
     return 'off';
+}
+
+// octave-agnostic, matching how every other quiz here compares notes -- and the on-screen
+// keyboard only spans one octave, so exact-octave matching would rule it out entirely
+function same_pitch_class(a, b) {
+    if (a === null || a === undefined || b === null || b === undefined) return true;
+    return a.mod(12) === b.mod(12);
 }
 
 // --- run loop -----------------------------------------------------------------
@@ -383,8 +441,8 @@ function rhythm_callback(event) {
     const beat = (get_audio_context().currentTime - rhythm_run_start) / beat_duration();
     if (beat < -0.5 || beat > total_beats() + 1) return; // ignore stray taps outside the run
 
-    rhythm_hits.push(beat);
-    stamp_hit(beat, accuracy_for(beat));
+    rhythm_hits.push({ beat, midi: key });
+    stamp_hit(beat, accuracy_for(beat, key));
 }
 
 function score_run() {
@@ -395,25 +453,34 @@ function score_run() {
     rhythm_start_button.disabled = false;
 
     const beatDur = beat_duration();
-    const onsets = current_rhythm.onsets;
+    const { onsets, onsetPitches } = current_rhythm;
     const claimed = new Set();
     let good = 0;
     let perfect = 0;
+    let wrongNote = 0; // played in time, but not the note that was written
 
     // greedily credit each written note to its nearest not-yet-used tap, so one tap can't
-    // satisfy two notes and a burst of taps can't inflate the score
-    onsets.forEach((onset) => {
+    // satisfy two notes and a burst of taps can't inflate the score. in melody mode only
+    // taps of the right pitch are eligible at all.
+    onsets.forEach((onset, oi) => {
         let bestIndex = -1;
         let bestDiff = Infinity;
+        let bestWrongDiff = Infinity;
         rhythm_hits.forEach((hit, i) => {
             if (claimed.has(i)) return;
-            const diff = Math.abs(hit - onset) * beatDur;
+            const diff = Math.abs(hit.beat - onset) * beatDur;
+            if (melodic() && !same_pitch_class(hit.midi, onsetPitches[oi])) {
+                bestWrongDiff = Math.min(bestWrongDiff, diff);
+                return;
+            }
             if (diff < bestDiff) { bestDiff = diff; bestIndex = i; }
         });
         if (bestIndex >= 0 && bestDiff <= MATCH_WINDOW) {
             claimed.add(bestIndex);
             if (bestDiff <= GOOD_WINDOW) good++;
             if (bestDiff <= PERFECT_WINDOW) perfect++;
+        } else if (bestWrongDiff <= GOOD_WINDOW) {
+            wrongNote++;
         }
     });
 
@@ -423,15 +490,19 @@ function score_run() {
     const passed = ratio >= PASS_RATIO && extra <= allowedExtra;
 
     const pct = Math.round(ratio * 100);
+    const scored = melodic() ? 'right' : 'in time';
     const extraNote = extra > 0 ? ` · ${extra} extra tap${extra === 1 ? '' : 's'}` : '';
+    // worth separating out: hitting the beat but the wrong note is a different mistake
+    // from being out of time, and the count alone wouldn't tell them apart
+    const wrongNote_note = wrongNote > 0 ? ` · ${wrongNote} in time but wrong note` : '';
     let message;
     if (passed) {
-        message = `pass — ${good}/${onsets.length} in time (${perfect} dead on)${extraNote}`;
+        message = `pass — ${good}/${onsets.length} ${scored} (${perfect} dead on)${extraNote}`;
     } else if (ratio >= PASS_RATIO) {
-        // the notes themselves were in time; it was the stray taps that sank it
-        message = `${good}/${onsets.length} in time, but ${extra} extra tap${extra === 1 ? '' : 's'} — at most ${allowedExtra} allowed`;
+        // the notes themselves were fine; it was the stray taps that sank it
+        message = `${good}/${onsets.length} ${scored}, but ${extra} extra tap${extra === 1 ? '' : 's'} — at most ${allowedExtra} allowed`;
     } else {
-        message = `${pct}% — ${good}/${onsets.length} in time${extraNote}, need ${Math.round(PASS_RATIO * 100)}%`;
+        message = `${pct}% — ${good}/${onsets.length} ${scored}${wrongNote_note}${extraNote}, need ${Math.round(PASS_RATIO * 100)}%`;
     }
     rhythm_feedback.textContent = message;
     rhythm_feedback.className = passed ? 'passed' : 'failed';
@@ -443,19 +514,21 @@ function score_run() {
 // --- wiring -------------------------------------------------------------------
 
 function next_rhythm() {
-    let rhythm = rhythm_settings.source === 'bach' ? bach_rhythm() : null;
+    const passage = rhythm_settings.source === 'bach' ? bach_excerpt() : null;
     let note = '';
-    if (rhythm_settings.source === 'bach' && !rhythm) {
+    if (rhythm_settings.source === 'bach' && !passage) {
         // no real passage runs that long -- say so rather than silently generating one
-        note = ` (no chorale passage that long — generated instead)`;
+        note = ' (no chorale passage that long — generated instead)';
     }
-    current_rhythm = rhythm || generate_rhythm();
+    current_rhythm = passage || generate_rhythm();
 
     render_rhythm_score();
     clear_stamps();
     rhythm_playhead.style.display = 'none';
     show_attribution(current_rhythm.attribution);
-    rhythm_feedback.textContent = 'press start, then play the rhythm on any key' + note;
+    rhythm_feedback.textContent = melodic()
+        ? 'press start, then play the notes as written' + note
+        : 'press start, then play the rhythm on any key' + note;
     rhythm_feedback.className = '';
 }
 
@@ -503,6 +576,11 @@ document.getElementById('rhythm_source').addEventListener('change', (e) => {
     next_rhythm();
 });
 
+document.getElementById('rhythm_melody').addEventListener('change', (e) => {
+    rhythm_settings.melody = e.target.checked;
+    next_rhythm();
+});
+
 document.getElementById('rhythm_vocabulary').addEventListener('change', (e) => {
     rhythm_settings.vocabulary = e.target.value;
     next_rhythm();
@@ -513,15 +591,18 @@ document.getElementById('rhythm_rests').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-// note vocabulary and rests only shape generated rhythms; a real passage has whatever
-// it has, so grey them out rather than letting them look effective
+// note vocabulary and rests only shape generated rhythms, and only a real passage carries
+// pitches to play -- grey out whichever don't apply rather than letting them look effective
 function sync_generator_controls() {
     const generated = rhythm_settings.source === 'generated';
-    ['rhythm_vocabulary', 'rhythm_rests'].forEach((id) => {
+    const set_enabled = (id, enabled) => {
         const input = document.getElementById(id);
-        input.disabled = !generated;
-        input.closest('label').classList.toggle('disabled', !generated);
-    });
+        input.disabled = !enabled;
+        input.closest('label').classList.toggle('disabled', !enabled);
+    };
+    set_enabled('rhythm_vocabulary', generated);
+    set_enabled('rhythm_rests', generated);
+    set_enabled('rhythm_melody', !generated);
 }
 sync_generator_controls();
 
@@ -529,4 +610,17 @@ document.getElementById('rhythm_metronome').addEventListener('change', (e) => {
     rhythm_settings.metronome = e.target.checked;
 });
 
+// Melody is the same trainer with pitches switched on. It gets its own topic button so
+// it's discoverable alongside the other practice modes, but the panel and its controls
+// are shared -- either button leaves you free to flip Pitches on or off from there.
+function init_melody() {
+    rhythm_settings.source = 'bach';
+    rhythm_settings.melody = true;
+    document.getElementById('rhythm_source').value = 'bach';
+    document.getElementById('rhythm_melody').checked = true;
+    sync_generator_controls();
+    init_rhythm();
+}
+
 add_game_button('Rhythm', init_rhythm, 'menu_rhythm', 'teal');
+add_game_button('Melody', init_melody, 'menu_rhythm', 'teal');
