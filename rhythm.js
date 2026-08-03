@@ -17,6 +17,7 @@ const LINE_HEIGHT = 118;      // vertical distance from one system to the next
 const FIRST_LINE_TOP = 20;
 const STRIP_BASE_OFFSET = 14; // gap between the strip's underside and the staff's top line
 const STRIP_HEIGHT = 16;
+const PLAYHEAD_OVERHANG = 3;  // how far the playhead pokes out of the strip, top and bottom
 
 const rhythm_settings = {
     tempo: 80,
@@ -291,24 +292,52 @@ function draw_timing_strips() {
         const right = rhythm_domains[lastIndex].end;
 
         const group = svg_element('g', { class: 'rhythm_grid' });
-        group.appendChild(svg_element('rect', {
-            x: left, y: topY, width: right - left, height: STRIP_HEIGHT,
-            fill: 'none', stroke: '#d4c5aa', 'stroke-width': 1,
-        }));
 
+        // shade alternate beats so the beat you're on is readable at a glance without
+        // having to count divisions. resets every measure, so beat 1 is always pale.
         for (let mi = firstIndex; mi <= lastIndex; mi++) {
             const { start, end } = rhythm_domains[mi];
-            // skip step 0 of the opening measure -- it is the rectangle's own left edge
-            for (let s = (mi === firstIndex ? 1 : 0); s < steps; s++) {
-                const onBeat = s % perBeat === 0; // barlines land here too, same weight
+            for (let b = 1; b < BEATS_PER_MEASURE; b += 2) {
+                const x0 = start + (b / BEATS_PER_MEASURE) * (end - start);
+                const x1 = start + ((b + 1) / BEATS_PER_MEASURE) * (end - start);
+                group.appendChild(svg_element('rect', {
+                    x: x0, y: topY, width: x1 - x0, height: STRIP_HEIGHT,
+                    fill: '#ece4d3', stroke: 'none',
+                }));
+            }
+        }
+
+        // divisions within each measure; measure starts are drawn separately below
+        for (let mi = firstIndex; mi <= lastIndex; mi++) {
+            const { start, end } = rhythm_domains[mi];
+            for (let s = 1; s < steps; s++) {
+                const onBeat = s % perBeat === 0;
+                const x = start + (s / steps) * (end - start);
                 group.appendChild(svg_element('line', {
-                    x1: start + (s / steps) * (end - start), y1: topY,
-                    x2: start + (s / steps) * (end - start), y2: bottomY,
+                    x1: x, y1: topY, x2: x, y2: bottomY,
                     stroke: onBeat ? '#7a6f5d' : '#d4c5aa',
                     'stroke-width': onBeat ? 1.5 : 1,
                 }));
             }
         }
+
+        group.appendChild(svg_element('rect', {
+            x: left, y: topY, width: right - left, height: STRIP_HEIGHT,
+            fill: 'none', stroke: '#d4c5aa', 'stroke-width': 1,
+        }));
+
+        // heavy rule at every barline, drawn last so it sits over the shading and
+        // divisions -- makes the measure you're in obvious while the playhead moves
+        const barlines = [];
+        for (let mi = firstIndex; mi <= lastIndex; mi++) barlines.push(rhythm_domains[mi].start);
+        barlines.push(right); // close the far end of the line
+        barlines.forEach((x) => {
+            group.appendChild(svg_element('line', {
+                x1: x, y1: topY, x2: x, y2: bottomY,
+                stroke: '#2a2520', 'stroke-width': 3,
+            }));
+        });
+
         svg.appendChild(group);
     }
 }
@@ -421,12 +450,14 @@ function animate_playhead() {
         return;
     }
 
-    // spans the timing strip and the staff together, tying the two representations
-    const { x, bottom, stripTop } = beat_to_position(beat);
+    // confined to the timing strip. it used to run down through the staff as well, but
+    // the strip is proportional in time while the notation is spaced by engraving
+    // convention, so down there the line sat away from the note it was sounding.
+    const { x, stripTop } = beat_to_position(beat);
     rhythm_playhead.style.display = 'block';
     rhythm_playhead.style.left = `${x}px`;
-    rhythm_playhead.style.top = `${stripTop}px`;
-    rhythm_playhead.style.height = `${bottom + 10 - stripTop}px`;
+    rhythm_playhead.style.top = `${stripTop - PLAYHEAD_OVERHANG}px`;
+    rhythm_playhead.style.height = `${STRIP_HEIGHT + PLAYHEAD_OVERHANG * 2}px`;
     if (beat < 0) rhythm_feedback.textContent = 'counting in…';
     else if (rhythm_feedback.textContent === 'counting in…') rhythm_feedback.textContent = 'go!';
 
