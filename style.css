@@ -519,12 +519,12 @@ pre#terminal {
 	opacity: 0.85;
 }
 
-/* one tick per tap, crossing its own system's timing strip so it can be read against
-   the proportional grid rather than against the engraved note spacing */
+/* one bar per tap, filling its own system's timing strip so it can be read against the
+   proportional grid rather than against the engraved note spacing. height comes from
+   JS, which owns the strip geometry. */
 .rhythm_stamp {
 	position: absolute;
 	width: 3px;
-	height: 18px;
 	border-radius: 2px;
 	transform: translateX(-1px);
 }
