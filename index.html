@@ -126,6 +126,13 @@
                             <span class="value_readout" id = "rhythm_tempo_value">80 bpm</span>
                         </label>
                         <label>
+                            <span class="control_label">Rhythms</span>
+                            <select id = "rhythm_source">
+                                <option value="generated" selected>Generated</option>
+                                <option value="bach">Bach chorales</option>
+                            </select>
+                        </label>
+                        <label>
                             <span class="control_label">Measures</span>
                             <select id = "rhythm_measures">
                                 <option value="2">2</option>
@@ -158,6 +165,7 @@
                             <div id = "rhythm_playhead" style="display: none"></div>
                         </div>
                     </div>
+                    <div id = "rhythm_source_label"></div>
                     <div id = "rhythm_feedback"></div>
                 </div>
                 <canvas id	= "visuals" style="display: none"></canvas>
@@ -199,6 +207,7 @@
     <script src = "chord_quiz.js"   ></script>
     <script src = "scale_quiz.js"   ></script>
     <script src = "scale_degrees.js"></script>
+    <script src = "rhythms_bach.js" ></script>
     <script src = "rhythm.js"       ></script>
     <script src = "buttons.js"      ></script>
     <script src = "interval_ear_training.js"></script>

@@ -541,6 +541,20 @@ pre#terminal {
 	background: var(--terracotta);
 }
 
+#rhythm_controls label.disabled {
+	opacity: 0.45;
+}
+
+#rhythm_source_label {
+	justify-content: center;
+	min-height: 18px;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 12px;
+	letter-spacing: 0.04em;
+	color: var(--ink-soft);
+	text-align: center;
+}
+
 #rhythm_feedback {
 	justify-content: center;
 	min-height: 28px;

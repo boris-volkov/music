@@ -21,6 +21,7 @@ const STRIP_HEIGHT = 16;
 const rhythm_settings = {
     tempo: 80,
     measures: 4,
+    source: 'generated', // 'generated' | 'bach'
     vocabulary: 'eighths',
     rests: true,
     metronome: true,
@@ -58,6 +59,7 @@ const rhythm_score = document.getElementById('rhythm_score');
 const rhythm_overlay = document.getElementById('rhythm_overlay');
 const rhythm_playhead = document.getElementById('rhythm_playhead');
 const rhythm_feedback = document.getElementById('rhythm_feedback');
+const rhythm_source_label = document.getElementById('rhythm_source_label');
 const rhythm_start_button = document.getElementById('rhythm_start');
 
 function beat_duration() {
@@ -82,10 +84,10 @@ function generate_measure() {
     return measure;
 }
 
-function generate_rhythm() {
-    const measures = [];
-    for (let m = 0; m < rhythm_settings.measures; m++) measures.push(generate_measure());
-
+// walks the measures assigning each note its absolute beat, and collects the onsets the
+// player is expected to tap. also settles how finely the timing strip has to be divided:
+// the grid needs a line at every possible onset, which is the shortest value in use.
+function finish_rhythm(measures, attribution = null) {
     const onsets = [];
     let beat = 0;
     measures.forEach((measure) => {
@@ -95,7 +97,44 @@ function generate_rhythm() {
             beat += DURATION_BEATS[note.duration];
         });
     });
-    return { measures, onsets };
+
+    const shortest = Math.min(...measures.flat().map((n) => DURATION_BEATS[n.duration]));
+    const perBeat = Math.max(1, Math.round(1 / Math.min(shortest, 1)));
+
+    return { measures, onsets, perBeat, attribution };
+}
+
+function generate_rhythm() {
+    const measures = [];
+    for (let m = 0; m < rhythm_settings.measures; m++) measures.push(generate_measure());
+    return finish_rhythm(measures);
+}
+
+// --- borrowed rhythms ---------------------------------------------------------
+
+function parse_pattern(pattern) {
+    return pattern.split(' ').map((token) => ({
+        duration: token.endsWith('r') ? token.slice(0, -1) : token,
+        rest: token.endsWith('r'),
+    }));
+}
+
+// takes a contiguous window out of one real passage, rather than stitching together
+// bars from unrelated pieces -- the point is to practise rhythms that actually occur
+function bach_rhythm() {
+    const wanted = rhythm_settings.measures;
+    const candidates = BACH_EXCERPTS.filter((e) => e.m.length >= wanted);
+    if (candidates.length === 0) return null;
+
+    const excerpt = random_element(candidates);
+    const offset = Math.floor(Math.random() * (excerpt.m.length - wanted + 1));
+    const measures = excerpt.m
+        .slice(offset, offset + wanted)
+        .map((i) => parse_pattern(BACH_PATTERNS[i]));
+
+    const first = offset + 1;
+    const bars = wanted === 1 ? `m. ${first}` : `mm. ${first}–${first + wanted - 1}`;
+    return finish_rhythm(measures, `${excerpt.s}, ${bars} (soprano)`);
 }
 
 // --- rendering ----------------------------------------------------------------
@@ -177,7 +216,6 @@ function render_rhythm_score() {
 // constant speed and sit on the note stems. The strip resolves that: it divides the
 // measure into even fractions of time, so the playhead sweeps smoothly across it and a
 // tap's mark can be compared against the grid line it was aiming for.
-const SUBDIVISIONS_PER_BEAT = { quarters: 1, eighths: 2, sixteenths: 4 };
 
 function svg_element(tag, attributes) {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -189,7 +227,7 @@ function svg_element(tag, attributes) {
 // the playhead crosses a barline without a gap to jump.
 function draw_timing_strips() {
     const svg = rhythm_score.querySelector('svg');
-    const perBeat = SUBDIVISIONS_PER_BEAT[rhythm_settings.vocabulary];
+    const perBeat = current_rhythm.perBeat; // fine enough to put a line under every onset
     const steps = BEATS_PER_MEASURE * perBeat;
     const lineCount = Math.ceil(rhythm_staves.length / MEASURES_PER_LINE);
 
@@ -399,11 +437,19 @@ function score_run() {
 // --- wiring -------------------------------------------------------------------
 
 function next_rhythm() {
-    current_rhythm = generate_rhythm();
+    let rhythm = rhythm_settings.source === 'bach' ? bach_rhythm() : null;
+    let note = '';
+    if (rhythm_settings.source === 'bach' && !rhythm) {
+        // no real passage runs that long -- say so rather than silently generating one
+        note = ` (no chorale passage that long — generated instead)`;
+    }
+    current_rhythm = rhythm || generate_rhythm();
+
     render_rhythm_score();
     clear_stamps();
     rhythm_playhead.style.display = 'none';
-    rhythm_feedback.textContent = 'press start, then play the rhythm on any key';
+    rhythm_source_label.textContent = current_rhythm.attribution || '';
+    rhythm_feedback.textContent = 'press start, then play the rhythm on any key' + note;
     rhythm_feedback.className = '';
 }
 
@@ -433,6 +479,12 @@ document.getElementById('rhythm_measures').addEventListener('change', (e) => {
     next_rhythm();
 });
 
+document.getElementById('rhythm_source').addEventListener('change', (e) => {
+    rhythm_settings.source = e.target.value;
+    sync_generator_controls();
+    next_rhythm();
+});
+
 document.getElementById('rhythm_vocabulary').addEventListener('change', (e) => {
     rhythm_settings.vocabulary = e.target.value;
     next_rhythm();
@@ -442,6 +494,18 @@ document.getElementById('rhythm_rests').addEventListener('change', (e) => {
     rhythm_settings.rests = e.target.checked;
     next_rhythm();
 });
+
+// note vocabulary and rests only shape generated rhythms; a real passage has whatever
+// it has, so grey them out rather than letting them look effective
+function sync_generator_controls() {
+    const generated = rhythm_settings.source === 'generated';
+    ['rhythm_vocabulary', 'rhythm_rests'].forEach((id) => {
+        const input = document.getElementById(id);
+        input.disabled = !generated;
+        input.closest('label').classList.toggle('disabled', !generated);
+    });
+}
+sync_generator_controls();
 
 document.getElementById('rhythm_metronome').addEventListener('change', (e) => {
     rhythm_settings.metronome = e.target.checked;
