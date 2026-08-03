@@ -8,16 +8,25 @@
 // the same clock the metronome clicks are scheduled against, so the visual playhead and
 // what you hear stay locked together.
 
-const RHYTHM_MEASURES = 4;
 const BEATS_PER_MEASURE = 4;
-const TOTAL_BEATS = RHYTHM_MEASURES * BEATS_PER_MEASURE;
+const MEASURES_PER_LINE = 4;
+
+// score geometry, in px
+const SCORE_MARGIN = 10;
+const LINE_HEIGHT = 118;   // vertical distance from one system to the next
+const FIRST_LINE_TOP = 20;
 
 const rhythm_settings = {
     tempo: 80,
+    measures: 4,
     vocabulary: 'eighths',
     rests: true,
     metronome: true,
 };
+
+function total_beats() {
+    return rhythm_settings.measures * BEATS_PER_MEASURE;
+}
 
 // Timing tolerances, in seconds. Absolute rather than beat-relative on purpose: playing
 // "tightly" means the same wall-clock precision whether the tempo is 60 or 140.
@@ -39,6 +48,7 @@ let rhythm_hits = [];        // beat positions of the player's taps this run
 let rhythm_run_start = null; // audio-clock time that beat 0 lands on
 let rhythm_running = false;
 let rhythm_raf = null;
+let rhythm_end_timer = null; // backstop so a run always ends, even if rAF is suspended
 
 const rhythm_panel = document.getElementById('rhythm_panel');
 const rhythm_score = document.getElementById('rhythm_score');
@@ -71,7 +81,7 @@ function generate_measure() {
 
 function generate_rhythm() {
     const measures = [];
-    for (let m = 0; m < RHYTHM_MEASURES; m++) measures.push(generate_measure());
+    for (let m = 0; m < rhythm_settings.measures; m++) measures.push(generate_measure());
 
     const onsets = [];
     let beat = 0;
@@ -91,18 +101,29 @@ function render_rhythm_score() {
     const VF = Vex.Flow;
     rhythm_score.innerHTML = '';
 
+    const measureCount = current_rhythm.measures.length;
+    const lines = Math.ceil(measureCount / MEASURES_PER_LINE);
+    // a run shorter than one line stretches to fill it rather than leaving dead space
+    const perLine = Math.min(measureCount, MEASURES_PER_LINE);
+
     const width = rhythm_score.clientWidth || 880;
     const renderer = new VF.Renderer(rhythm_score, VF.Renderer.Backends.SVG);
-    renderer.resize(width, 150);
+    renderer.resize(width, FIRST_LINE_TOP + lines * LINE_HEIGHT);
     const context = renderer.getContext();
 
-    const margin = 10;
-    const staveWidth = (width - margin * 2) / RHYTHM_MEASURES;
+    const staveWidth = (width - SCORE_MARGIN * 2) / perLine;
     rhythm_staves = [];
 
     current_rhythm.measures.forEach((measure, mi) => {
-        const stave = new VF.Stave(margin + mi * staveWidth, 45, staveWidth);
-        if (mi === 0) stave.addClef('percussion').addTimeSignature('4/4');
+        const line = Math.floor(mi / MEASURES_PER_LINE);
+        const column = mi % MEASURES_PER_LINE;
+        const stave = new VF.Stave(
+            SCORE_MARGIN + column * staveWidth,
+            FIRST_LINE_TOP + line * LINE_HEIGHT,
+            staveWidth
+        );
+        if (column === 0) stave.addClef('percussion'); // clef repeats on each new line
+        if (mi === 0) stave.addTimeSignature('4/4');
         stave.setContext(context).draw();
         rhythm_staves.push(stave);
 
@@ -118,16 +139,21 @@ function render_rhythm_score() {
     });
 }
 
-// maps a position in beats to an x pixel coordinate, interpolating linearly across each
-// measure's note area. used for both the playhead and where taps get stamped.
-function beat_to_x(beat) {
-    const clamped = Math.max(0, Math.min(beat, TOTAL_BEATS));
-    const mi = Math.min(RHYTHM_MEASURES - 1, Math.floor(clamped / BEATS_PER_MEASURE));
+// maps a position in beats to a point on the score, interpolating linearly across each
+// measure's note area. y matters once the score wraps: the playhead has to drop to the
+// next system rather than run off the right edge.
+function beat_to_position(beat) {
+    const clamped = Math.max(0, Math.min(beat, total_beats()));
+    const mi = Math.min(rhythm_staves.length - 1, Math.floor(clamped / BEATS_PER_MEASURE));
     const stave = rhythm_staves[mi];
     const startX = stave.getNoteStartX();
     const endX = stave.getX() + stave.getWidth();
     const withinMeasure = (clamped - mi * BEATS_PER_MEASURE) / BEATS_PER_MEASURE;
-    return startX + withinMeasure * (endX - startX);
+    return {
+        x: startX + withinMeasure * (endX - startX),
+        top: stave.getYForLine(0),
+        bottom: stave.getYForLine(4),
+    };
 }
 
 function clear_stamps() {
@@ -135,9 +161,11 @@ function clear_stamps() {
 }
 
 function stamp_hit(beat, accuracy) {
+    const { x, top } = beat_to_position(beat);
     const stamp = document.createElement('div');
     stamp.className = `rhythm_stamp ${accuracy}`;
-    stamp.style.left = `${beat_to_x(beat)}px`;
+    stamp.style.left = `${x}px`;
+    stamp.style.top = `${top - 34}px`; // sits just above its own system's staff
     rhythm_overlay.appendChild(stamp);
 }
 
@@ -172,12 +200,23 @@ function start_rhythm_run() {
     rhythm_run_start = ctx.currentTime + leadIn + BEATS_PER_MEASURE * beatDur;
 
     if (rhythm_settings.metronome) {
-        for (let b = 0; b < TOTAL_BEATS; b++) {
+        for (let b = 0; b < total_beats(); b++) {
             play_click(rhythm_run_start + b * beatDur, b % BEATS_PER_MEASURE === 0);
         }
     }
 
     rhythm_running = true;
+
+    // the browser suspends requestAnimationFrame in a background tab, so if the player
+    // switches away mid-run the playhead loop -- and with it score_run() -- would never
+    // fire again, leaving the round stuck open forever. this timer ends the run
+    // regardless. background setTimeout gets clamped to ~1s, which is late but still
+    // unsticks it; whichever path fires first wins, since score_run clears the other.
+    const runSeconds = (rhythm_run_start - ctx.currentTime) + total_beats() * beatDur + MATCH_WINDOW;
+    rhythm_end_timer = setTimeout(() => {
+        if (rhythm_running) score_run();
+    }, (runSeconds + 0.15) * 1000);
+
     animate_playhead();
 }
 
@@ -186,13 +225,16 @@ function animate_playhead() {
     const beat = (get_audio_context().currentTime - rhythm_run_start) / beat_duration();
 
     // keep listening a moment past the final beat so a slightly late last tap still counts
-    if (beat >= TOTAL_BEATS + MATCH_WINDOW / beat_duration()) {
+    if (beat >= total_beats() + MATCH_WINDOW / beat_duration()) {
         score_run();
         return;
     }
 
+    const { x, top, bottom } = beat_to_position(beat);
     rhythm_playhead.style.display = 'block';
-    rhythm_playhead.style.left = `${beat_to_x(beat)}px`;
+    rhythm_playhead.style.left = `${x}px`;
+    rhythm_playhead.style.top = `${top - 12}px`;
+    rhythm_playhead.style.height = `${bottom - top + 24}px`;
     if (beat < 0) rhythm_feedback.textContent = 'counting in…';
     else if (rhythm_feedback.textContent === 'counting in…') rhythm_feedback.textContent = 'go!';
 
@@ -205,7 +247,7 @@ function rhythm_callback(event) {
     if (!rhythm_running) return;
 
     const beat = (get_audio_context().currentTime - rhythm_run_start) / beat_duration();
-    if (beat < -0.5 || beat > TOTAL_BEATS + 1) return; // ignore stray taps outside the run
+    if (beat < -0.5 || beat > total_beats() + 1) return; // ignore stray taps outside the run
 
     rhythm_hits.push(beat);
     stamp_hit(beat, accuracy_for(beat));
@@ -214,6 +256,7 @@ function rhythm_callback(event) {
 function score_run() {
     rhythm_running = false;
     cancelAnimationFrame(rhythm_raf);
+    clearTimeout(rhythm_end_timer);
     rhythm_playhead.style.display = 'none';
     rhythm_start_button.disabled = false;
 
@@ -277,6 +320,7 @@ function next_rhythm() {
 function stop_rhythm() { // handed to init_quiz so switching modes kills the run
     rhythm_running = false;
     cancelAnimationFrame(rhythm_raf);
+    clearTimeout(rhythm_end_timer);
     rhythm_start_button.disabled = false;
 }
 
@@ -292,6 +336,11 @@ rhythm_start_button.addEventListener('pointerdown', start_rhythm_run);
 document.getElementById('rhythm_tempo').addEventListener('input', (e) => {
     rhythm_settings.tempo = parseInt(e.target.value, 10);
     document.getElementById('rhythm_tempo_value').textContent = `${rhythm_settings.tempo} bpm`;
+});
+
+document.getElementById('rhythm_measures').addEventListener('change', (e) => {
+    rhythm_settings.measures = parseInt(e.target.value, 10);
+    next_rhythm();
 });
 
 document.getElementById('rhythm_vocabulary').addEventListener('change', (e) => {

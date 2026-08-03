@@ -510,19 +510,18 @@ pre#terminal {
 	display: block;
 }
 
+/* top/height are set per-frame from JS -- once the score wraps onto several lines the
+   playhead has to sit on whichever system it's currently scanning */
 #rhythm_playhead {
 	position: absolute;
-	top: 8px;
-	bottom: 8px;
 	width: 2px;
 	background: var(--terracotta);
 	opacity: 0.85;
 }
 
-/* one tick per tap, sitting above the staff so it never covers the notes */
+/* one tick per tap, sitting above its own system's staff so it never covers the notes */
 .rhythm_stamp {
 	position: absolute;
-	top: 12px;
 	width: 3px;
 	height: 26px;
 	border-radius: 2px;
