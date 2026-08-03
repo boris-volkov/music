@@ -545,14 +545,30 @@ pre#terminal {
 	opacity: 0.45;
 }
 
+/* sits above the score, naming the passage the rhythm was taken from */
 #rhythm_source_label {
+	display: flex; /* set explicitly -- the panel's block context would otherwise win */
+	flex-direction: column;
+	align-items: center;
 	justify-content: center;
-	min-height: 18px;
-	font-family: 'IBM Plex Mono', monospace;
-	font-size: 12px;
-	letter-spacing: 0.04em;
-	color: var(--ink-soft);
+	gap: 2px;
+	min-height: 20px;
 	text-align: center;
+}
+
+#rhythm_source_label .piece_title {
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	color: var(--ink);
+}
+
+#rhythm_source_label .piece_detail {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
 }
 
 #rhythm_feedback {

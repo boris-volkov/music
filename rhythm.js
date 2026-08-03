@@ -132,9 +132,15 @@ function bach_rhythm() {
         .slice(offset, offset + wanted)
         .map((i) => parse_pattern(BACH_PATTERNS[i]));
 
+    const [catalogue, title] = BACH_PIECES[excerpt.p];
     const first = offset + 1;
     const bars = wanted === 1 ? `m. ${first}` : `mm. ${first}–${first + wanted - 1}`;
-    return finish_rhythm(measures, `${excerpt.s}, ${bars} (soprano)`);
+    // a handful of the source files carry no BWV number; their filename stem is no use
+    // to a reader, so just leave the catalogue segment out for those
+    const parts = ['J.S. Bach'];
+    if (/^BWV/.test(catalogue)) parts.push(catalogue);
+    parts.push(`${bars}, soprano`);
+    return finish_rhythm(measures, { title, detail: parts.join(' · ') });
 }
 
 // --- rendering ----------------------------------------------------------------
@@ -448,9 +454,21 @@ function next_rhythm() {
     render_rhythm_score();
     clear_stamps();
     rhythm_playhead.style.display = 'none';
-    rhythm_source_label.textContent = current_rhythm.attribution || '';
+    show_attribution(current_rhythm.attribution);
     rhythm_feedback.textContent = 'press start, then play the rhythm on any key' + note;
     rhythm_feedback.className = '';
+}
+
+function show_attribution(attribution) {
+    rhythm_source_label.innerHTML = '';
+    if (!attribution) return;
+    const title = document.createElement('span');
+    title.className = 'piece_title';
+    title.textContent = attribution.title;
+    const detail = document.createElement('span');
+    detail.className = 'piece_detail';
+    detail.textContent = attribution.detail;
+    rhythm_source_label.append(title, detail);
 }
 
 function stop_rhythm() { // handed to init_quiz so switching modes kills the run
