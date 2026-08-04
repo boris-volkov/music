@@ -432,6 +432,30 @@ pre#terminal {
 	word-break: break-word;
 }
 
+#quiz_controls {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	min-height: 0;
+}
+
+#replay_button {
+	padding: 8px 16px;
+	border-radius: 6px;
+	border: 1px solid var(--line);
+	background: var(--panel);
+	color: var(--ink);
+	font-weight: 600;
+	font-size: 13px;
+	letter-spacing: 0.05em;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+#replay_button:hover {
+	background: var(--line);
+}
+
 #notation_toggle {
 	padding: 10px 16px;
 	border-radius: 6px;

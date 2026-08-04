@@ -6,7 +6,10 @@
 // everybody -- the default is A0, the lowest key of a standard 88-key board, and anyone
 // on a smaller keyboard just rebinds it to something they actually have.
 
-const DEFAULT_BINDINGS = { start_stop: 21 }; // A0
+const DEFAULT_BINDINGS = {
+    start_stop: 21, // A0, the lowest key of an 88-key board
+    replay: 22,     // A#0, sitting next to it
+};
 const BINDINGS_STORAGE_KEY = 'music_theory_midi_bindings';
 
 let midi_bindings = load_bindings();

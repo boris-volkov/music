@@ -8,6 +8,8 @@ function init_quiz(starter, callback, cleanup = null){ // sending both funcs suc
     if (current_quiz_cleanup) current_quiz_cleanup();
     current_quiz_cleanup = cleanup;
     reset_display(); // clears any stale notation panel left over from a previous mode
+    // only modes that play something for you get a replay button; they re-show it after
+    document.getElementById('replay_button').style.display = 'none';
     starter();
     current_quiz_callback = callback;
     bindMidiInputs(); // safe even if midi isn't ready yet or no keyboard is plugged in
