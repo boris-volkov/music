@@ -111,6 +111,7 @@ function bindMidiInputs() { // (re)attaches the message handler to every current
     midi.inputs.forEach((entry) => {
         entry.onmidimessage = (e) => {
             logMidi(e); // always visible in devtools, so a silent keyboard vs. a silent game is easy to tell apart
+            if (consume_control_note(e)) return; // a key being bound isn't also an answer
             onMIDIMessage(e);
             if (current_quiz_callback) current_quiz_callback(e);
         };

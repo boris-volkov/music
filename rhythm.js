@@ -43,7 +43,7 @@ function total_beats() {
 const PERFECT_WINDOW = 0.05;
 const GOOD_WINDOW = 0.12;
 const MATCH_WINDOW = 0.28; // past this a tap isn't credited to that note at all
-const PASS_RATIO = 0.75;
+const PASS_RATIO = 0.9;
 
 const DURATION_BEATS = { 'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25 };
 const VOCABULARY = {
@@ -510,6 +510,15 @@ function animate_playhead() {
 function rhythm_callback(event) {
     const [type, key, velocity] = event.data;
     if (type !== KEYDOWN || velocity === 0) return; // taps only, ignore note-offs
+
+    // the bound transport key works whether or not a run is going, and never counts as
+    // a tap -- see controls.js for how it's assigned
+    if (key === midi_bindings.start_stop) {
+        if (rhythm_running) abort_run();
+        else start_rhythm_run();
+        return;
+    }
+
     if (!rhythm_running) return;
 
     const beat = (get_audio_context().currentTime - rhythm_run_start) / beat_duration();
@@ -564,7 +573,9 @@ function score_run() {
     const ratio = onsets.length ? good / onsets.length : 0;
     const passed = ratio >= PASS_RATIO && extra <= allowedExtra;
 
-    const pct = Math.round(ratio * 100);
+    // floored, not rounded: 26/29 rounds up to "90%" while still failing a 90% bar,
+    // which reads as a contradiction
+    const pct = Math.floor(ratio * 100);
     const scored = melodic() ? 'right' : 'in time';
     const extraNote = extra > 0 ? ` · ${extra} extra tap${extra === 1 ? '' : 's'}` : '';
     // worth separating out: hitting the beat but the wrong note is a different mistake
