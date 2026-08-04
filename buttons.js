@@ -31,31 +31,48 @@ function toggleFullscreen() {
 }
 
 
-const toggleButton = document.getElementById('options_toggle');
-const contentDiv = document.getElementById('choices');
-let prev_canvas_display;
+// Options live in panels opened from the menu bar, one at a time. They sit above the
+// practice area rather than replacing it, so the keyboard and prompt stay visible while
+// settings are being changed.
 
-function optionsOn(){
-    toggleButton.classList.add("active");
-    contentDiv.style.display = 'flex';
+const menu_tabs = [...document.querySelectorAll('.menu_tab')];
+
+function open_options_panel(id) {
+    menu_tabs.forEach((tab) => {
+        const isTarget = tab.dataset.panel === id;
+        tab.classList.toggle('active', isTarget);
+        document.getElementById(tab.dataset.panel).style.display = isTarget ? 'flex' : 'none';
+    });
 }
 
-function optionsOff(){
-    toggleButton.classList.remove("active");
-    contentDiv.style.display = 'none';
-    restore_display(); // back to whatever the active mode was showing, not always the terminal
+function optionsOff() {
+    open_options_panel(null); // no panel matches, so they all close
 }
 
-toggleButton.addEventListener('pointerdown', () => {
-    if (contentDiv.style.display === 'none'){
-        contentDiv.style.display = 'flex';
-        hide_all_displays();
-        prev_canvas_display = canvas.style.display;
-        canvas.style.display = 'none';
-    } else {
-        contentDiv.style.display = 'none';
-        restore_display();
-        canvas.style.display = prev_canvas_display;
-    }
-    toggleButton.classList.toggle("active");
+// Kept for theory.js, which pops the note pickers open when a game has nothing selected
+function optionsOn() {
+    open_options_panel('panel_practice');
+}
+
+menu_tabs.forEach((tab) => {
+    tab.addEventListener('pointerdown', () => {
+        const alreadyOpen = tab.classList.contains('active');
+        open_options_panel(alreadyOpen ? null : tab.dataset.panel);
+    });
 });
+
+// Each activity only cares about some of the note pickers -- a chord quiz has no use for
+// the interval list. Showing only what applies keeps the panel from becoming a wall.
+function set_relevant_options(sections) {
+    let anyShown = false;
+    document.querySelectorAll('#panel_practice .choice_holder').forEach((holder) => {
+        const relevant = sections.includes(holder.dataset.section);
+        holder.style.display = relevant ? 'flex' : 'none';
+        if (relevant) anyShown = true;
+    });
+
+    document.getElementById('practice_empty_note').style.display = anyShown ? 'none' : 'block';
+    const practiceTab = menu_tabs.find((t) => t.dataset.panel === 'panel_practice');
+    practiceTab.disabled = !anyShown;
+    if (!anyShown && practiceTab.classList.contains('active')) optionsOff();
+}

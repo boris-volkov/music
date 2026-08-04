@@ -15,6 +15,7 @@ function random_EarInterval(){
 const EarInterval_callback = make_chord_style_callback(() => EarInterval_array, random_EarInterval, 500);
 
 function init_EarInterval(){
+    set_relevant_options(['notes', 'intervals']);
     canvas.style.display = 'none';
     init_quiz(random_EarInterval, EarInterval_callback);
 }

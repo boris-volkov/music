@@ -16,6 +16,7 @@ function random_chord(){
 const chord_callback = make_chord_style_callback(() => chord_array, random_chord);
 
 function init_chord(){
+    set_relevant_options(['notes', 'chords']);
     canvas.style.display = 'none';
     init_quiz(random_chord, chord_callback)
 }

@@ -12,6 +12,7 @@ function random_note(){
 const note_callback = make_single_note_callback(() => note.number % 12, random_note);
 
 function init_note(){
+    set_relevant_options(['notes']);
     canvas.style.display = 'none';
     init_quiz(random_note, note_callback);
 }

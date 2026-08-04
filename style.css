@@ -146,24 +146,6 @@ canvas {
 	gap: 20px;
 }
 
-#instructions {
-	background: var(--ink);
-	color: var(--canvas);
-	padding: 16px;
-	border-radius: 8px;
-	font-family: 'IBM Plex Mono', monospace;
-	font-size: 13px;
-	line-height: 1.6;
-}
-
-#instructions div {
-	opacity: 0.8;
-}
-
-#instructions div + div {
-	margin-top: 8px;
-}
-
 #game_choices {
 	display: flex;
 	flex-direction: column;
@@ -226,21 +208,59 @@ canvas {
 	border-color: var(--ink);
 }
 
-#options_toggle {
-	margin-top: auto;
-	padding: 12px 16px;
-	background: var(--ink);
-	color: var(--canvas);
+/* Menu bar and the option panels it opens */
+
+#menu_bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.menu_tab {
+	padding: 10px 16px;
 	border-radius: 6px;
+	border: 2px solid var(--line);
+	background: var(--panel);
+	color: var(--ink);
 	font-weight: 600;
 	font-size: 13px;
-	letter-spacing: 0.05em;
+	letter-spacing: 0.04em;
 	cursor: pointer;
 	transition: background 0.15s;
 }
 
-#options_toggle:hover, #options_toggle.active {
-	background: var(--ink-deep);
+.menu_tab:hover:not(:disabled) {
+	background: var(--line);
+}
+
+.menu_tab.active {
+	background: var(--ink);
+	color: var(--canvas);
+	border-color: var(--ink);
+}
+
+.menu_tab:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+#menu_bar #notation_toggle {
+	margin-left: auto; /* a display toggle, not an options panel -- sits apart */
+}
+
+.option_panel {
+	background: var(--panel);
+	border: 2px solid var(--line);
+	border-radius: 8px;
+	padding: 16px;
+	flex-direction: column;
+	gap: 16px;
+}
+
+#practice_empty_note {
+	font-size: 13px;
+	color: var(--ink-soft);
 }
 
 /* Right column */
@@ -251,16 +271,7 @@ canvas {
 	gap: 16px;
 }
 
-/* More-options panel (note/interval/chord/scale pickers) */
-
-div#choices {
-	background: var(--panel);
-	border: 2px solid var(--line);
-	border-radius: 8px;
-	padding: 16px;
-	flex-direction: column;
-	gap: 16px;
-}
+/* Contents of the option panels */
 
 div.choice_holder {
 	display: flex;
@@ -277,13 +288,13 @@ div.selection_title {
 	color: var(--ink-soft);
 }
 
-div#choices div.selection {
+div.option_panel div.selection {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
 }
 
-div#choices button {
+div.option_panel button {
 	padding: 6px 10px;
 	border-radius: 5px;
 	border: 1px solid var(--line);
@@ -295,17 +306,17 @@ div#choices button {
 	transition: background 0.15s;
 }
 
-div#choices button:hover {
+div.option_panel button:hover {
 	background: var(--line);
 }
 
-div#choices button.active {
+div.option_panel button.active {
 	background: var(--ink);
 	color: var(--canvas);
 	border-color: var(--ink);
 }
 
-div#choices div.selection.binding_list {
+div.option_panel div.selection.binding_list {
 	flex-direction: column;
 	flex-wrap: nowrap;
 	align-items: stretch;
@@ -347,7 +358,7 @@ div.binding_hint {
 	color: var(--ink-soft);
 }
 
-div#choices div.selection.sound_settings {
+div.option_panel div.selection.sound_settings {
 	flex-direction: column;
 	flex-wrap: nowrap;
 	align-items: stretch;
@@ -422,15 +433,14 @@ pre#terminal {
 }
 
 #notation_toggle {
-	align-self: flex-end;
-	padding: 6px 12px;
-	border-radius: 5px;
-	border: 1px solid var(--line);
+	padding: 10px 16px;
+	border-radius: 6px;
+	border: 2px solid var(--line);
 	background: var(--panel);
 	color: var(--ink);
-	font-size: 12px;
+	font-size: 13px;
 	font-weight: 600;
-	letter-spacing: 0.03em;
+	letter-spacing: 0.04em;
 	cursor: pointer;
 	transition: background 0.15s;
 }

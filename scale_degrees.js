@@ -25,6 +25,7 @@ function random_scale_degree(){
 const scale_degree_callback = make_single_note_callback(() => note_to_guess, random_scale_degree);
 
 function init_scale_degree(){
+    set_relevant_options(['notes', 'scales']);
     canvas.style.display = 'none';
     init_quiz(random_scale_degree, scale_degree_callback)
 }

@@ -639,6 +639,7 @@ function stop_rhythm() { // handed to init_quiz so switching modes kills the run
 
 // shared by both topic buttons -- they differ only in whether pitches are required
 function init_rhythm_panel() {
+    set_relevant_options([]); // its settings live inline above the score, not in a panel
     canvas.style.display = 'none';
     init_quiz(next_rhythm, rhythm_callback, stop_rhythm);
     show_display('rhythm');

@@ -20,6 +20,111 @@
             <button id = "full_screen" title="Toggle fullscreen">&#9974;</button>
         </div>
         <div id = "midi_status">Checking for MIDI access&hellip;</div>
+        <div id = "menu_bar">
+            <button class="menu_tab" data-panel="panel_practice">&#9881; Practice</button>
+            <button class="menu_tab" data-panel="panel_audio">&#9835; Audio</button>
+            <button class="menu_tab" data-panel="panel_controls">&#9000; Controls</button>
+            <button id = "notation_toggle" title="Toggle musical notation">&#9834; Notation</button>
+        </div>
+
+        <div id = "panel_practice" class="option_panel" style="display: none">
+            <div class="choice_holder" data-section="notes">
+                <div class="selection_title">base notes of chords, intervals, and scales</div>
+                <div id = "note_types" class="selection"></div>
+            </div>
+            <div class="choice_holder" data-section="intervals">
+                <div class="selection_title">intervals</div>
+                <div id = "interval_types" class="selection"></div>
+            </div>
+            <div class="choice_holder" data-section="chords">
+                <div class="selection_title">chords</div>
+                <div id = "chord_types" class="selection"></div>
+            </div>
+            <div class="choice_holder" data-section="scales">
+                <div class="selection_title">scales and modes</div>
+                <div id = "scale_types" class="selection"></div>
+            </div>
+            <div id = "practice_empty_note">This activity has no note choices to make.</div>
+        </div>
+
+        <div id = "panel_audio" class="option_panel" style="display: none">
+            <div class="choice_holder">
+                <div class="selection_title">playback</div>
+                <div class="selection sound_settings">
+                    <label>
+                        <span class="control_label">Play through</span>
+                        <select id = "playback_output">
+                            <option value="midi" selected>MIDI instrument</option>
+                            <option value="synth">Built-in synth</option>
+                        </select>
+                        <span class="value_readout" id = "playback_output_note"></span>
+                    </label>
+                    <label>
+                        <span class="control_label">Note length</span>
+                        <input type="range" id = "synth_duration" min="0.1" max="2" step="0.1" value="1.0">
+                        <span class="value_readout" id = "synth_duration_value">1.0s</span>
+                    </label>
+                    <label>
+                        <span class="control_label">Gap</span>
+                        <input type="range" id = "synth_gap" min="0.1" max="2" step="0.1" value="0.5">
+                        <span class="value_readout" id = "synth_gap_value">0.5s</span>
+                    </label>
+                </div>
+            </div>
+            <div class="choice_holder">
+                <div class="selection_title">synth tone</div>
+                <div class="selection sound_settings">
+                    <label>
+                        <span class="control_label">Waveform</span>
+                        <select id = "synth_waveform">
+                            <option value="sine" selected>Sine</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="sawtooth">Sawtooth</option>
+                            <option value="square">Square</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span class="control_label">Detune</span>
+                        <input type="range" id = "synth_detune" min="0" max="30" step="1" value="6">
+                        <span class="value_readout" id = "synth_detune_value">6&cent;</span>
+                    </label>
+                    <label>
+                        <span class="control_label">Attack</span>
+                        <input type="range" id = "synth_attack" min="0" max="200" step="5" value="20">
+                        <span class="value_readout" id = "synth_attack_value">20ms</span>
+                    </label>
+                    <label>
+                        <span class="control_label">Release</span>
+                        <input type="range" id = "synth_release" min="10" max="400" step="10" value="80">
+                        <span class="value_readout" id = "synth_release_value">80ms</span>
+                    </label>
+                    <label>
+                        <span class="control_label">Volume</span>
+                        <input type="range" id = "synth_volume" min="0" max="50" step="1" value="16">
+                        <span class="value_readout" id = "synth_volume_value">16%</span>
+                    </label>
+                    <div class="sound_preview_buttons">
+                        <button id = "synth_preview_note">&#9658; note</button>
+                        <button id = "synth_preview_interval">&#9658; interval</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id = "panel_controls" class="option_panel" style="display: none">
+            <div class="choice_holder">
+                <div class="selection_title">keyboard controls</div>
+                <div class="selection binding_list">
+                    <div class="binding_row" data-control="start_stop">
+                        <span class="binding_label">Start / stop a run</span>
+                        <span class="binding_key"></span>
+                        <button type="button">Set</button>
+                    </div>
+                    <div class="binding_hint">Press Set, then play the key you want to use.</div>
+                </div>
+            </div>
+        </div>
+
         <div id = "app_grid">
             <div id = "left_column">
                 <div id = "game_choices">
@@ -40,95 +145,8 @@
                         <div class="menu_panel_body" id = "menu_rhythm"></div>
                     </div>
                 </div>
-                <button id = "options_toggle">&#9881; MORE OPTIONS</button>
             </div>
             <div id = "right_column">
-                <div id = choices style="display: none">
-                    <div class="choice_holder">
-                        <div class="selection_title">base notes of chords, intervals, and scales</div>
-                        <div id = "note_types" class="selection"></div>
-                    </div>
-                    <div class="choice_holder">
-                        <div class="selection_title">intervals</div>
-                        <div id = "interval_types" class="selection"></div>
-                    </div>
-                    <div class="choice_holder">
-                        <div class="selection_title">chords</div>
-                        <div id = "chord_types" class="selection"></div>
-                    </div>
-                    <div class="choice_holder">
-                        <div class="selection_title">scales and modes</div>
-                        <div id = "scale_types" class="selection"></div>
-                    </div>
-                    <div class="choice_holder">
-                        <div class="selection_title">keyboard controls</div>
-                        <div class="selection binding_list">
-                            <div class="binding_row" data-control="start_stop">
-                                <span class="binding_label">Start / stop a run</span>
-                                <span class="binding_key"></span>
-                                <button type="button">Set</button>
-                            </div>
-                            <div class="binding_hint">Press Set, then play the key you want to use.</div>
-                        </div>
-                    </div>
-                    <div class="choice_holder">
-                        <div class="selection_title">sound</div>
-                        <div class="selection sound_settings">
-                            <label>
-                                <span class="control_label">Play through</span>
-                                <select id = "playback_output">
-                                    <option value="midi" selected>MIDI instrument</option>
-                                    <option value="synth">Built-in synth</option>
-                                </select>
-                                <span class="value_readout" id = "playback_output_note"></span>
-                            </label>
-                            <label>
-                                <span class="control_label">Waveform</span>
-                                <select id = "synth_waveform">
-                                    <option value="sine" selected>Sine</option>
-                                    <option value="triangle">Triangle</option>
-                                    <option value="sawtooth">Sawtooth</option>
-                                    <option value="square">Square</option>
-                                </select>
-                            </label>
-                            <label>
-                                <span class="control_label">Detune</span>
-                                <input type="range" id = "synth_detune" min="0" max="30" step="1" value="6">
-                                <span class="value_readout" id = "synth_detune_value">6&cent;</span>
-                            </label>
-                            <label>
-                                <span class="control_label">Attack</span>
-                                <input type="range" id = "synth_attack" min="0" max="200" step="5" value="20">
-                                <span class="value_readout" id = "synth_attack_value">20ms</span>
-                            </label>
-                            <label>
-                                <span class="control_label">Release</span>
-                                <input type="range" id = "synth_release" min="10" max="400" step="10" value="80">
-                                <span class="value_readout" id = "synth_release_value">80ms</span>
-                            </label>
-                            <label>
-                                <span class="control_label">Volume</span>
-                                <input type="range" id = "synth_volume" min="0" max="50" step="1" value="16">
-                                <span class="value_readout" id = "synth_volume_value">16%</span>
-                            </label>
-                            <label>
-                                <span class="control_label">Note length</span>
-                                <input type="range" id = "synth_duration" min="0.1" max="2" step="0.1" value="1.0">
-                                <span class="value_readout" id = "synth_duration_value">1.0s</span>
-                            </label>
-                            <label>
-                                <span class="control_label">Gap</span>
-                                <input type="range" id = "synth_gap" min="0.1" max="2" step="0.1" value="0.5">
-                                <span class="value_readout" id = "synth_gap_value">0.5s</span>
-                            </label>
-                            <div class="sound_preview_buttons">
-                                <button id = "synth_preview_note">&#9658; note</button>
-                                <button id = "synth_preview_interval">&#9658; interval</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <button id = "notation_toggle" title="Toggle musical notation">&#9834; Notation</button>
                 <pre id = "terminal">Select a topic to begin.</pre>
                 <div id = "notation" style="display: none"></div>
                 <div id = "rhythm_panel" style="display: none">

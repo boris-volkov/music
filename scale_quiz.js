@@ -103,6 +103,7 @@ function scale_cleanup(){ // is this ever used?
 }
 
 function init_scale(){
+    set_relevant_options(['notes', 'scales']);
     canvas.style.display = 'block';
     id = setInterval(refresh_timer, 50);
     init_quiz(random_scale, scale_listener); 

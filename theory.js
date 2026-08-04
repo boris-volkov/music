@@ -43,7 +43,7 @@ class Notes {
   get_random() {
     if (this.list.every((item) => item.active == false)) {
       cprint("make at least one active choice for this game in the options");
-      contentDiv.style.display = 'flex';
+      optionsOn();
       return null;
     }
     // might be cleaner way to do this
@@ -207,7 +207,7 @@ class Structure_Collection {
   get_random() {
     if (this.list.every((item) => item.active == false)) {
       cprint("make at least one active choice for this game in the options");
-      contentDiv.style.display = 'flex';
+      optionsOn();
       return null;
     }
     // might be cleaner way to do this
