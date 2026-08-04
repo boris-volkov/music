@@ -84,9 +84,11 @@ function init(midiAccess) {
     listInputsAndOutputs(midiAccess);
     bindMidiInputs();
     refresh_midi_status();
+    sync_playback_controls(); // an output may now be available to play through
     midi.onstatechange = () => { // fires when a keyboard is plugged in or unplugged
         bindMidiInputs();
         refresh_midi_status();
+        sync_playback_controls();
     };
 }
 
@@ -112,48 +114,16 @@ function bindMidiInputs() { // (re)attaches the message handler to every current
         entry.onmidimessage = (e) => {
             logMidi(e); // always visible in devtools, so a silent keyboard vs. a silent game is easy to tell apart
             if (consume_control_note(e)) return; // a key being bound isn't also an answer
+            if (is_own_echo(e.data[1])) return;  // our own playback looping back in
             onMIDIMessage(e);
             if (current_quiz_callback) current_quiz_callback(e);
         };
     });
 }
 
-class MidiMessage {
-  constructor(status = KEYDOWN, data1 = 36, data2 = 100) {
-    this.status = status;
-    this.data1 = data1;
-    this.data2 = data2;
-  }
-
-  send() {
-    const outputs = midi.outputs;
-    const outputIterator = outputs.values();
-    const firstOutput = outputIterator.next().value;
-  
-    if (!firstOutput) {
-      console.error("No MIDI output available.");
-      return;
-    }
-  
-    const output = firstOutput;
-    output.send([this.status, this.data1, this.data2]);
-  
-    // Assuming Note On message (status: 0x90), schedule a Note Off message after 1 second
-    if (this.status === 0x90) {
-      setTimeout(() => {
-        output.send([this.status - 0x10, this.data1, 0]); // Send Note Off message with velocity 0
-      }, 1000);
-    }
-  }
-  
-  
-}
-
-function sequentially(functions, delay) {
-  for (let i = 0; i < functions.length; i++) {
-      setTimeout(functions[i], i * delay);
-  }
-}
+// MidiMessage / sequentially() used to live here -- the original note playback. Replaced
+// by play_notes_via_midi() in audio.js, which picks a port that can actually sound and
+// schedules note-offs on the send timestamp rather than through setTimeout.
 
 
 

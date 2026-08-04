@@ -80,6 +80,14 @@
                         <div class="selection_title">sound</div>
                         <div class="selection sound_settings">
                             <label>
+                                <span class="control_label">Play through</span>
+                                <select id = "playback_output">
+                                    <option value="midi" selected>MIDI instrument</option>
+                                    <option value="synth">Built-in synth</option>
+                                </select>
+                                <span class="value_readout" id = "playback_output_note"></span>
+                            </label>
+                            <label>
                                 <span class="control_label">Waveform</span>
                                 <select id = "synth_waveform">
                                     <option value="sine" selected>Sine</option>

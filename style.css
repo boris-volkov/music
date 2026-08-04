@@ -382,6 +382,10 @@ div.sound_settings select {
 	font-size: 13px;
 }
 
+div.sound_settings label.disabled {
+	opacity: 0.45;
+}
+
 div.sound_settings .value_readout {
 	min-width: 44px;
 	text-align: right;

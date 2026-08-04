@@ -25,6 +25,31 @@ document.getElementById('synth_waveform').addEventListener('change', (e) => {
     synth_settings.waveform = e.target.value;
 });
 
+document.getElementById('playback_output').addEventListener('change', (e) => {
+    playback_settings.output = e.target.value;
+    sync_playback_controls();
+});
+
+// The tone controls only shape the built-in synth, so grey them out when notes are going
+// to a real instrument. Also says so when MIDI is chosen but nothing can sound it, rather
+// than silently playing through the synth and leaving the setting looking wrong.
+function sync_playback_controls() {
+    const wanted_midi = playback_settings.output === 'midi';
+    const on_midi = using_midi_output();
+    const port = sounding_midi_output();
+
+    document.getElementById('playback_output_note').textContent =
+        !wanted_midi ? '' : on_midi ? (port.name || 'connected') : 'none found — using synth';
+
+    ['synth_waveform', 'synth_detune', 'synth_attack', 'synth_release', 'synth_volume']
+        .forEach((id) => {
+            const input = document.getElementById(id);
+            input.disabled = on_midi;
+            input.closest('label').classList.toggle('disabled', on_midi);
+        });
+}
+sync_playback_controls();
+
 document.getElementById('synth_preview_note').addEventListener('pointerdown', () => {
     const ctx = get_audio_context();
     play_tone(64, ctx.currentTime, synth_settings.note_duration); // E4
