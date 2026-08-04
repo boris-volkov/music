@@ -18,12 +18,14 @@ const FIRST_LINE_TOP = 20;
 const STRIP_BASE_OFFSET = 14; // gap between the strip's underside and the staff's top line
 const STRIP_HEIGHT = 16;
 const PLAYHEAD_OVERHANG = 3;  // how far the playhead pokes out of the strip, top and bottom
+const GRAND_STAFF_GAP = 95;   // treble stave top to bass stave top, when both hands play
 
 const rhythm_settings = {
     tempo: 80,
     measures: 4,
     source: 'generated', // 'generated' | 'bach'
     melody: false,       // also require the written pitch, not just the timing
+    hands: 'right',      // 'right' | 'both' -- 'both' adds the chorale's bass line
     vocabulary: 'eighths',
     rests: true,
     metronome: true,
@@ -32,6 +34,11 @@ const rhythm_settings = {
 // melodies only exist in the borrowed corpus, so melody mode implies a real passage
 function melodic() {
     return rhythm_settings.melody && rhythm_settings.source === 'bach';
+}
+
+// the bass line is only worth showing when its pitches are being asked for
+function two_handed() {
+    return melodic() && rhythm_settings.hands === 'both';
 }
 
 function total_beats() {
@@ -95,25 +102,41 @@ function generate_measure() {
 // walks the measures assigning each note its absolute beat, and collects the onsets the
 // player is expected to tap. also settles how finely the timing strip has to be divided:
 // the grid needs a line at every possible onset, which is the shortest value in use.
-function finish_rhythm(measures, attribution = null, key = null) {
-    const onsets = [];
-    const onsetPitches = []; // parallel to onsets; null when the passage has no pitches
-    let beat = 0;
-    measures.forEach((measure) => {
-        measure.forEach((note) => {
-            note.startBeat = beat;
-            if (!note.rest) {
-                onsets.push(beat);
-                onsetPitches.push(note.pitch ? pitch_to_midi(note.pitch) : null);
-            }
-            beat += DURATION_BEATS[note.duration];
+function finish_rhythm(measures, attribution = null, key = null, bass = null) {
+    // walk a voice, stamping each note with its absolute beat and collecting what the
+    // player has to hit. with two hands both voices contribute to the same target list.
+    const targets = [];
+    const walk = (voice) => {
+        let beat = 0;
+        voice.forEach((measure) => {
+            measure.forEach((note) => {
+                note.startBeat = beat;
+                if (!note.rest) {
+                    targets.push({ beat, midi: note.pitch ? pitch_to_midi(note.pitch) : null });
+                }
+                beat += DURATION_BEATS[note.duration];
+            });
         });
-    });
+    };
+    walk(measures);
+    if (bass) walk(bass);
 
-    const shortest = Math.min(...measures.flat().map((n) => DURATION_BEATS[n.duration]));
+    // in beat order, so the greedy matcher in score_run works through them as played
+    targets.sort((a, b) => a.beat - b.beat);
+
+    const allNotes = measures.flat().concat(bass ? bass.flat() : []);
+    const shortest = Math.min(...allNotes.map((n) => DURATION_BEATS[n.duration]));
     const perBeat = Math.max(1, Math.round(1 / Math.min(shortest, 1)));
 
-    return { measures, onsets, onsetPitches, perBeat, attribution, key };
+    return {
+        measures,
+        bass,
+        onsets: targets.map((t) => t.beat),
+        onsetPitches: targets.map((t) => t.midi), // parallel; null when there are no pitches
+        perBeat,
+        attribution,
+        key,
+    };
 }
 
 function generate_rhythm() {
@@ -152,14 +175,17 @@ function pitch_to_midi(pitch) {
 // bars from unrelated pieces -- the point is to practise music that actually occurs
 function bach_excerpt() {
     const wanted = rhythm_settings.measures;
-    const candidates = BACH_EXCERPTS.filter((e) => e.m.length >= wanted);
+    const candidates = BACH_EXCERPTS.filter((e) => e.s.length >= wanted);
     if (candidates.length === 0) return null;
 
     const excerpt = random_element(candidates);
-    const offset = Math.floor(Math.random() * (excerpt.m.length - wanted + 1));
-    const measures = excerpt.m
+    const offset = Math.floor(Math.random() * (excerpt.s.length - wanted + 1));
+    const read = (indices) => indices
         .slice(offset, offset + wanted)
         .map((mi) => BACH_MEASURES[mi].map((ni) => parse_note(BACH_NOTES[ni])));
+
+    const measures = read(excerpt.s);
+    const bass = two_handed() ? read(excerpt.b) : null;
 
     const [catalogue, title, key] = BACH_PIECES[excerpt.p];
     const first = offset + 1;
@@ -168,8 +194,8 @@ function bach_excerpt() {
     // to a reader, so just leave the catalogue segment out for those
     const parts = ['J.S. Bach'];
     if (/^BWV/.test(catalogue)) parts.push(catalogue);
-    parts.push(`${bars}, soprano`);
-    return finish_rhythm(measures, { title, detail: parts.join(' · ') }, key);
+    parts.push(`${bars}, ${bass ? 'soprano & bass' : 'soprano'}`);
+    return finish_rhythm(measures, { title, detail: parts.join(' · ') }, key, bass);
 }
 
 // --- rendering ----------------------------------------------------------------
@@ -178,12 +204,36 @@ function bach_excerpt() {
 // time signature, so its note area starts inset from its own x. Measuring that inset up
 // front lets each stave be widened by exactly its own overhead, which makes every
 // measure's note area come out the same width and butt directly against the next one.
-function stave_overhead(withClef, withTimeSignature, keySignature) {
+function stave_overhead(clef, withTimeSignature, keySignature) {
     const probe = new Vex.Flow.Stave(0, 0, 200);
-    if (withClef) probe.addClef(melodic() ? 'treble' : 'percussion');
+    if (clef) probe.addClef(clef);
     if (keySignature) probe.addKeySignature(keySignature);
     if (withTimeSignature) probe.addTimeSignature('4/4');
     return probe.getNoteStartX() - probe.getX();
+}
+
+function upper_clef() {
+    return melodic() ? 'treble' : 'percussion';
+}
+
+// a grand staff needs room underneath each system for the bass staff
+function line_height() {
+    return two_handed() ? LINE_HEIGHT + GRAND_STAFF_GAP : LINE_HEIGHT;
+}
+
+function build_stave_notes(measure, clef) {
+    const VF = Vex.Flow;
+    return measure.map((note) => {
+        const options = {
+            // rhythm-only notation parks every note on the middle line; melody mode puts
+            // it at its written pitch
+            keys: [melodic() && note.pitch ? pitch_to_vexkey(note.pitch) : 'b/4'],
+            duration: note.rest ? note.duration + 'r' : note.duration,
+            clef, // without this the bass staff would place notes as if it were treble
+        };
+        if (!melodic()) options.stem_direction = 1; // uniform stems read as a rhythm
+        return new VF.StaveNote(options);
+    });
 }
 
 function render_rhythm_score() {
@@ -195,10 +245,11 @@ function render_rhythm_score() {
 
     const width = rhythm_score.clientWidth || 880;
     const renderer = new VF.Renderer(rhythm_score, VF.Renderer.Backends.SVG);
-    renderer.resize(width, FIRST_LINE_TOP + lineCount * LINE_HEIGHT);
+    renderer.resize(width, FIRST_LINE_TOP + lineCount * line_height());
     const context = renderer.getContext();
 
     const usable = width - SCORE_MARGIN * 2;
+    const grand = two_handed();
     rhythm_staves = [];
     rhythm_domains = [];
 
@@ -206,8 +257,16 @@ function render_rhythm_score() {
         const firstIndex = line * MEASURES_PER_LINE;
         const count = Math.min(MEASURES_PER_LINE, measureCount - firstIndex);
         const keySignature = melodic() ? current_rhythm.key : null;
-        const leadOverhead = stave_overhead(true, line === 0, keySignature);
-        const plainOverhead = stave_overhead(false, false, null);
+        const topY = FIRST_LINE_TOP + line * line_height();
+
+        // a bass clef is wider than a treble one, so on a grand staff the roomier of the
+        // two sets the lead overhead -- otherwise the staves' note areas would start at
+        // different x and the two hands wouldn't line up vertically
+        const leadOverhead = Math.max(
+            stave_overhead(upper_clef(), line === 0, keySignature),
+            grand ? stave_overhead('bass', line === 0, keySignature) : 0
+        );
+        const plainOverhead = stave_overhead(null, false, null);
 
         // every measure gets an identical note-area width, so the playhead keeps one
         // constant speed across the whole line and no gap opens up at the barlines
@@ -222,40 +281,81 @@ function render_rhythm_score() {
             else if (column === count - 1) staveWidth = noteAreaWidth + plainOverhead;
             else staveWidth = noteAreaWidth;
 
-            const stave = new VF.Stave(x, FIRST_LINE_TOP + line * LINE_HEIGHT, staveWidth);
+            const stave = new VF.Stave(x, topY, staveWidth);
+            const bassStave = grand ? new VF.Stave(x, topY + GRAND_STAFF_GAP, staveWidth) : null;
+
             if (column === 0) { // clef and key signature repeat on each new line
-                stave.addClef(melodic() ? 'treble' : 'percussion');
+                stave.addClef(upper_clef());
                 if (keySignature) stave.addKeySignature(keySignature);
+                if (bassStave) {
+                    bassStave.addClef('bass');
+                    if (keySignature) bassStave.addKeySignature(keySignature);
+                }
             }
-            if (mi === 0) stave.addTimeSignature('4/4');
+            if (mi === 0) {
+                stave.addTimeSignature('4/4');
+                if (bassStave) bassStave.addTimeSignature('4/4');
+            }
+
+            if (bassStave) { // force both note areas to begin together
+                const startX = Math.max(stave.getNoteStartX(), bassStave.getNoteStartX());
+                stave.setNoteStartX(startX);
+                bassStave.setNoteStartX(startX);
+            }
+
             stave.setContext(context).draw();
+            if (bassStave) bassStave.setContext(context).draw();
             rhythm_staves.push(stave);
 
             const start = stave.getNoteStartX();
             rhythm_domains.push({ start, end: start + noteAreaWidth });
 
-            const staveNotes = current_rhythm.measures[mi].map((note) => {
-                const options = {
-                    // rhythm-only notation parks every note on the middle line; melody
-                    // mode puts it at its written pitch
-                    keys: [melodic() && note.pitch ? pitch_to_vexkey(note.pitch) : 'b/4'],
-                    duration: note.rest ? note.duration + 'r' : note.duration,
-                };
-                if (!melodic()) options.stem_direction = 1; // uniform stems read as a rhythm
-                return new VF.StaveNote(options);
-            });
+            const upperNotes = build_stave_notes(current_rhythm.measures[mi], upper_clef());
+            const lowerNotes = bassStave
+                ? build_stave_notes(current_rhythm.bass[mi], 'bass')
+                : null;
+
+            const voices = [];
+            const makeVoice = (notes) => {
+                const v = new VF.Voice({ num_beats: BEATS_PER_MEASURE, beat_value: 4 });
+                v.addTickables(notes);
+                voices.push(v);
+                return v;
+            };
+            const upperVoice = makeVoice(upperNotes);
+            const lowerVoice = lowerNotes ? makeVoice(lowerNotes) : null;
 
             if (melodic()) {
                 // lets VexFlow work out which accidentals actually need printing given
                 // the key signature and what has already appeared in the bar
-                const voice = new VF.Voice({ num_beats: BEATS_PER_MEASURE, beat_value: 4 });
-                voice.addTickables(staveNotes);
-                VF.Accidental.applyAccidentals([voice], keySignature);
+                VF.Accidental.applyAccidentals(voices, keySignature);
             }
 
-            const beams = VF.Beam.generateBeams(staveNotes);
-            VF.Formatter.FormatAndDraw(context, stave, staveNotes);
+            const beams = VF.Beam.generateBeams(upperNotes)
+                .concat(lowerNotes ? VF.Beam.generateBeams(lowerNotes) : []);
+
+            // formatting both voices together is what keeps the hands aligned in time
+            const formatter = new VF.Formatter();
+            voices.forEach((v) => formatter.joinVoices([v]));
+            formatter.formatToStave(voices, stave);
+
+            upperVoice.setContext(context).setStave(stave).draw();
+            if (lowerVoice) lowerVoice.setContext(context).setStave(bassStave).draw();
             beams.forEach((beam) => beam.setContext(context).draw());
+
+            if (bassStave) { // brace the system, and join the barlines between staves
+                const connector = column === 0 ? VF.StaveConnector.type.BRACE : null;
+                if (connector !== null) {
+                    new VF.StaveConnector(stave, bassStave)
+                        .setType(connector).setContext(context).draw();
+                }
+                new VF.StaveConnector(stave, bassStave)
+                    .setType(VF.StaveConnector.type.SINGLE_RIGHT).setContext(context).draw();
+                if (column === 0) {
+                    new VF.StaveConnector(stave, bassStave)
+                        .setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
+                }
+            }
 
             x += staveWidth;
         }
@@ -678,6 +778,11 @@ document.getElementById('rhythm_source').addEventListener('change', (e) => {
     next_rhythm();
 });
 
+document.getElementById('rhythm_hands').addEventListener('change', (e) => {
+    rhythm_settings.hands = e.target.value;
+    next_rhythm();
+});
+
 document.getElementById('rhythm_vocabulary').addEventListener('change', (e) => {
     rhythm_settings.vocabulary = e.target.value;
     next_rhythm();
@@ -701,6 +806,7 @@ function sync_generator_controls() {
     set_enabled('rhythm_vocabulary', generated && !melodic());
     set_enabled('rhythm_rests', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
+    set_enabled('rhythm_hands', melodic()); // only pitched practice has a left hand to play
 }
 sync_generator_controls();
 
