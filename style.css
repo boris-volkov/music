@@ -10,7 +10,6 @@
 	--ink-deep: #1a1510;
 	--ink-soft: #7a6f5d;
 	--white-key: #e8dcc8;
-	--white-key-pressed: #d4c5aa;
 	--teal: #b8d4c8;
 	--teal-border: #9ec4b4;
 	--teal-bright: #a0d6b8;
@@ -720,12 +719,14 @@ div.white {
 	transition: background 0.1s;
 }
 
+/* same amber as the black keys -- a lit key should read as one colour whichever it is.
+   the old tint was a step from the key's own resting tan, too slight to spot. */
 div.white:active {
-	background: var(--white-key-pressed);
+	background: var(--amber);
 }
 
 div.white.pressed {
-	background: var(--white-key-pressed);
+	background: var(--amber);
 }
 
 div.white.correct, div.black.correct {
