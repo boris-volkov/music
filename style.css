@@ -483,9 +483,30 @@ pre#terminal {
 	background: var(--ink-deep);
 }
 
-#rhythm_start:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
+#rhythm_start.running {
+	background: var(--terracotta);
+	color: var(--canvas);
+}
+
+#rhythm_start.running:hover {
+	background: #c5695c;
+}
+
+#rhythm_new {
+	padding: 8px 14px;
+	border-radius: 6px;
+	border: 1px solid var(--line);
+	background: var(--canvas);
+	color: var(--ink);
+	font-weight: 600;
+	font-size: 13px;
+	letter-spacing: 0.05em;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+#rhythm_new:hover {
+	background: var(--line);
 }
 
 #rhythm_stage {

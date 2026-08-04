@@ -84,6 +84,7 @@ function play_click(startTime, accent = false) {
     gain.connect(ctx.destination);
     osc.start(startTime);
     osc.stop(startTime + duration);
+    return osc; // handed back so a whole run's clicks can be cancelled if it's stopped early
 }
 
 // plays each note in turn, overlapping slightly so consecutive notes still feel connected

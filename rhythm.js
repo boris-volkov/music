@@ -60,6 +60,7 @@ let rhythm_run_start = null; // audio-clock time that beat 0 lands on
 let rhythm_running = false;
 let rhythm_raf = null;
 let rhythm_end_timer = null; // backstop so a run always ends, even if rAF is suspended
+let scheduled_clicks = [];   // this run's metronome, so stopping early can silence it
 
 const rhythm_panel = document.getElementById('rhythm_panel');
 const rhythm_score = document.getElementById('rhythm_score');
@@ -401,6 +402,42 @@ function same_pitch_class(a, b) {
 
 // --- run loop -----------------------------------------------------------------
 
+function prompt_text() {
+    return melodic()
+        ? 'press start, then play the notes as written'
+        : 'press start, then play the rhythm on any key';
+}
+
+function update_start_button() {
+    rhythm_start_button.textContent = rhythm_running ? '■ STOP' : '▶ START';
+    rhythm_start_button.classList.toggle('running', rhythm_running);
+}
+
+function cancel_scheduled_clicks() {
+    const now = get_audio_context().currentTime;
+    scheduled_clicks.forEach((osc) => {
+        // stopping at a time before the note's scheduled start means it never sounds
+        try { osc.stop(now); } catch (e) { /* already finished */ }
+    });
+    scheduled_clicks = [];
+}
+
+// bail out of a run without scoring it, leaving the same passage up to try again --
+// no reason to sit through the rest of a take you already fluffed
+function abort_run() {
+    if (!rhythm_running) return;
+    rhythm_running = false;
+    cancelAnimationFrame(rhythm_raf);
+    clearTimeout(rhythm_end_timer);
+    cancel_scheduled_clicks();
+    rhythm_playhead.style.display = 'none';
+    clear_stamps();
+    rhythm_hits = [];
+    update_start_button();
+    rhythm_feedback.textContent = prompt_text();
+    rhythm_feedback.className = '';
+}
+
 function start_rhythm_run() {
     if (rhythm_running) return;
     const ctx = get_audio_context();
@@ -411,21 +448,27 @@ function start_rhythm_run() {
     clear_stamps();
     rhythm_feedback.textContent = 'counting in…';
     rhythm_feedback.className = '';
-    rhythm_start_button.disabled = true;
+
+    // every click for the whole run is scheduled up front on the audio clock, so stopping
+    // early has to reach back and cancel them or the metronome plays on by itself
+    scheduled_clicks = [];
 
     // one full measure of count-in, always audible even with the metronome switched off
     for (let b = 0; b < BEATS_PER_MEASURE; b++) {
-        play_click(ctx.currentTime + leadIn + b * beatDur, b === 0);
+        scheduled_clicks.push(play_click(ctx.currentTime + leadIn + b * beatDur, b === 0));
     }
     rhythm_run_start = ctx.currentTime + leadIn + BEATS_PER_MEASURE * beatDur;
 
     if (rhythm_settings.metronome) {
         for (let b = 0; b < total_beats(); b++) {
-            play_click(rhythm_run_start + b * beatDur, b % BEATS_PER_MEASURE === 0);
+            scheduled_clicks.push(
+                play_click(rhythm_run_start + b * beatDur, b % BEATS_PER_MEASURE === 0)
+            );
         }
     }
 
     rhythm_running = true;
+    update_start_button();
 
     // the browser suspends requestAnimationFrame in a background tab, so if the player
     // switches away mid-run the playhead loop -- and with it score_run() -- would never
@@ -480,8 +523,9 @@ function score_run() {
     rhythm_running = false;
     cancelAnimationFrame(rhythm_raf);
     clearTimeout(rhythm_end_timer);
+    cancel_scheduled_clicks();
     rhythm_playhead.style.display = 'none';
-    rhythm_start_button.disabled = false;
+    update_start_button();
 
     const beatDur = beat_duration();
     const { onsets, onsetPitches } = current_rhythm;
@@ -557,10 +601,9 @@ function next_rhythm() {
     clear_stamps();
     rhythm_playhead.style.display = 'none';
     show_attribution(current_rhythm.attribution);
-    rhythm_feedback.textContent = melodic()
-        ? 'press start, then play the notes as written' + note
-        : 'press start, then play the rhythm on any key' + note;
+    rhythm_feedback.textContent = prompt_text() + note;
     rhythm_feedback.className = '';
+    update_start_button();
 }
 
 function show_attribution(attribution) {
@@ -579,17 +622,33 @@ function stop_rhythm() { // handed to init_quiz so switching modes kills the run
     rhythm_running = false;
     cancelAnimationFrame(rhythm_raf);
     clearTimeout(rhythm_end_timer);
-    rhythm_start_button.disabled = false;
+    cancel_scheduled_clicks();
+    update_start_button();
 }
 
-function init_rhythm() {
+// shared by both topic buttons -- they differ only in whether pitches are required
+function init_rhythm_panel() {
     canvas.style.display = 'none';
     init_quiz(next_rhythm, rhythm_callback, stop_rhythm);
     show_display('rhythm');
     render_rhythm_score(); // re-render now the panel is visible and has a real width
 }
 
-rhythm_start_button.addEventListener('pointerdown', start_rhythm_run);
+function init_rhythm() {
+    rhythm_settings.melody = false; // this topic is timing only, whatever the source
+    sync_generator_controls();
+    init_rhythm_panel();
+}
+
+rhythm_start_button.addEventListener('pointerdown', () => {
+    if (rhythm_running) abort_run();
+    else start_rhythm_run();
+});
+
+document.getElementById('rhythm_new').addEventListener('pointerdown', () => {
+    abort_run();
+    next_rhythm();
+});
 
 document.getElementById('rhythm_tempo').addEventListener('input', (e) => {
     rhythm_settings.tempo = parseInt(e.target.value, 10);
@@ -607,11 +666,6 @@ document.getElementById('rhythm_source').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-document.getElementById('rhythm_melody').addEventListener('change', (e) => {
-    rhythm_settings.melody = e.target.checked;
-    next_rhythm();
-});
-
 document.getElementById('rhythm_vocabulary').addEventListener('change', (e) => {
     rhythm_settings.vocabulary = e.target.value;
     next_rhythm();
@@ -622,8 +676,9 @@ document.getElementById('rhythm_rests').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-// note vocabulary and rests only shape generated rhythms, and only a real passage carries
-// pitches to play -- grey out whichever don't apply rather than letting them look effective
+// note vocabulary and rests only shape generated rhythms, and melody practice can only
+// come from a real passage -- grey out whichever don't apply rather than letting them
+// look effective
 function sync_generator_controls() {
     const generated = rhythm_settings.source === 'generated';
     const set_enabled = (id, enabled) => {
@@ -631,9 +686,9 @@ function sync_generator_controls() {
         input.disabled = !enabled;
         input.closest('label').classList.toggle('disabled', !enabled);
     };
-    set_enabled('rhythm_vocabulary', generated);
-    set_enabled('rhythm_rests', generated);
-    set_enabled('rhythm_melody', !generated);
+    set_enabled('rhythm_vocabulary', generated && !melodic());
+    set_enabled('rhythm_rests', generated && !melodic());
+    set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
 }
 sync_generator_controls();
 
@@ -645,12 +700,11 @@ document.getElementById('rhythm_metronome').addEventListener('change', (e) => {
 // it's discoverable alongside the other practice modes, but the panel and its controls
 // are shared -- either button leaves you free to flip Pitches on or off from there.
 function init_melody() {
-    rhythm_settings.source = 'bach';
+    rhythm_settings.source = 'bach'; // the only corpus carrying pitches
     rhythm_settings.melody = true;
     document.getElementById('rhythm_source').value = 'bach';
-    document.getElementById('rhythm_melody').checked = true;
     sync_generator_controls();
-    init_rhythm();
+    init_rhythm_panel();
 }
 
 add_game_button('Rhythm', init_rhythm, 'menu_rhythm', 'teal');
