@@ -41,6 +41,11 @@ function two_handed() {
     return melodic() && rhythm_settings.hands === 'both';
 }
 
+// left hand alone: the bass becomes the one voice, read from a bass-clef staff
+function left_only() {
+    return melodic() && rhythm_settings.hands === 'left';
+}
+
 function total_beats() {
     return rhythm_settings.measures * BEATS_PER_MEASURE;
 }
@@ -184,7 +189,8 @@ function bach_excerpt() {
         .slice(offset, offset + wanted)
         .map((mi) => BACH_MEASURES[mi].map((ni) => parse_note(BACH_NOTES[ni])));
 
-    const measures = read(excerpt.s);
+    // left hand alone practises the bass on its own, so it becomes the primary voice
+    const measures = left_only() ? read(excerpt.b) : read(excerpt.s);
     const bass = two_handed() ? read(excerpt.b) : null;
 
     const [catalogue, title, key] = BACH_PIECES[excerpt.p];
@@ -194,7 +200,8 @@ function bach_excerpt() {
     // to a reader, so just leave the catalogue segment out for those
     const parts = ['J.S. Bach'];
     if (/^BWV/.test(catalogue)) parts.push(catalogue);
-    parts.push(`${bars}, ${bass ? 'soprano & bass' : 'soprano'}`);
+    const voice = bass ? 'soprano & bass' : left_only() ? 'bass' : 'soprano';
+    parts.push(`${bars}, ${voice}`);
     return finish_rhythm(measures, { title, detail: parts.join(' · ') }, key, bass);
 }
 
@@ -213,7 +220,8 @@ function stave_overhead(clef, withTimeSignature, keySignature) {
 }
 
 function upper_clef() {
-    return melodic() ? 'treble' : 'percussion';
+    if (!melodic()) return 'percussion';
+    return left_only() ? 'bass' : 'treble';
 }
 
 // a grand staff needs room underneath each system for the bass staff
