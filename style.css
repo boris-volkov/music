@@ -64,16 +64,9 @@ canvas {
 
 #header h1 {
 	margin: 0;
-	font-size: 28px;
+	font-size: 24px;
 	font-weight: 700;
 	letter-spacing: 0.02em;
-}
-
-#kicker {
-	font-size: 14px;
-	font-weight: 500;
-	color: var(--ink-soft);
-	letter-spacing: 0.05em;
 }
 
 #full_screen {
@@ -93,32 +86,29 @@ canvas {
 	background: var(--panel);
 }
 
-/* MIDI status bar */
+/* MIDI status indicator */
 
 #midi_status {
-	padding: 8px 16px;
-	border-radius: 8px;
-	font-family: 'IBM Plex Mono', monospace;
-	font-size: 13px;
-	font-weight: 600;
-	letter-spacing: 0.03em;
+	margin-left: auto;
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--line);
 	text-align: center;
-	color: var(--ink);
-	background: var(--line);
-	transition: background 0.2s ease;
+	transition: color 0.2s ease;
+	cursor: help;
+	padding: 4px 8px;
 }
 
 #midi_status.status-ok {
-	background: var(--teal-bright);
+	color: var(--teal-bright);
 }
 
 #midi_status.status-warn {
-	background: var(--amber);
+	color: var(--amber);
 }
 
 #midi_status.status-error {
-	background: var(--terracotta);
-	color: var(--canvas);
+	color: var(--terracotta);
 }
 
 /* Layout grid */

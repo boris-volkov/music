@@ -10,7 +10,7 @@ const midi_status = document.getElementById('midi_status');
 
 function set_midi_status(message, level) { // level: 'ok' | 'warn' | 'error'
   if (!midi_status) return;
-  midi_status.textContent = message;
+  midi_status.title = message;
   midi_status.classList.remove('status-ok', 'status-warn', 'status-error');
   midi_status.classList.add('status-' + level);
 }
