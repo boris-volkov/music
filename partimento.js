@@ -202,9 +202,9 @@ document.getElementById('partimento_types').addEventListener('pointerdown', (e) 
 function init_partimento() {
     rhythm_settings.melody = false; // partimento is pitched whatever the melody switch says
     rhythm_settings.source = 'partimento';
-    rhythm_settings.hands = 'both'; // the whole point of the exercise
     document.getElementById('rhythm_source').value = 'partimento';
-    document.getElementById('rhythm_hands').value = 'both';
+    // the hands aren't set here: two_handed() knows partimento is two-handed on its own,
+    // and sync_generator_controls pins and greys the control to match
     sync_generator_controls();
     // the roots come from the note pickers, the figures from their own row beneath them
     init_rhythm_panel(['notes', 'partimento']);

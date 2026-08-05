@@ -42,14 +42,17 @@ function melodic() {
     return partimento_mode() || (rhythm_settings.melody && rhythm_settings.source === 'bach');
 }
 
-// the lower line is only worth showing when its pitches are being asked for
+// the lower line is only worth showing when its pitches are being asked for. A partimento
+// pattern is a shape made by two hands against each other -- one hand of it is half an
+// exercise -- so it is two-handed by nature rather than by setting, and saying so here
+// rather than by forcing the setting means no route into the mode can miss it.
 function two_handed() {
-    return melodic() && rhythm_settings.hands === 'both';
+    return partimento_mode() || (melodic() && rhythm_settings.hands === 'both');
 }
 
 // left hand alone: the lower voice becomes the one voice, read from a bass-clef staff
 function left_only() {
-    return melodic() && rhythm_settings.hands === 'left';
+    return !partimento_mode() && melodic() && rhythm_settings.hands === 'left';
 }
 
 function total_beats() {
@@ -873,7 +876,14 @@ function sync_generator_controls() {
     set_enabled('rhythm_vocabulary', generated && !melodic());
     set_enabled('rhythm_rests', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
-    set_enabled('rhythm_hands', melodic()); // only pitched practice has a left hand to play
+    set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
+
+    // ...and while partimento is up the control is pinned to Both, not merely greyed:
+    // a disabled select still reading "Left" would be describing an exercise that is
+    // being played with two hands. The stored preference is left alone underneath, so
+    // melody practice gets its own choice back on the way out.
+    const hands = document.getElementById('rhythm_hands');
+    hands.value = partimento_mode() ? 'both' : rhythm_settings.hands;
 }
 sync_generator_controls();
 
