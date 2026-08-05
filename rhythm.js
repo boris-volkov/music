@@ -577,7 +577,7 @@ function abort_run() {
 }
 
 function start_rhythm_run() {
-    if (rhythm_running) return;
+    if (rhythm_running || !current_rhythm) return; // nothing to play along to
     const ctx = get_audio_context();
     const beatDur = beat_duration();
     const leadIn = 0.3; // brief pause so the very first click isn't clipped
@@ -748,7 +748,18 @@ function score_run() {
 
 function next_rhythm() {
     let passage = null;
-    if (partimento_mode()) passage = partimento_passage();
+    if (partimento_mode()) {
+        // Say so rather than quietly generating a rhythm. If partimento.js is missing --
+        // a browser holding a stale copy of one script alongside a fresh copy of another
+        // is the way this happens -- the source would otherwise fall through to the
+        // generator, and picking the mode would look like it simply did nothing.
+        if (typeof partimento_passage !== 'function') {
+            rhythm_feedback.textContent = 'partimento patterns failed to load — reload the page';
+            rhythm_feedback.className = 'failed';
+            return;
+        }
+        passage = partimento_passage();
+    }
     else if (rhythm_settings.source === 'bach') passage = bach_excerpt();
 
     let note = '';
