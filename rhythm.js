@@ -23,25 +23,32 @@ const GRAND_STAFF_GAP = 95;   // treble stave top to bass stave top, when both h
 const rhythm_settings = {
     tempo: 80,
     measures: 4,
-    source: 'generated', // 'generated' | 'bach'
+    source: 'generated', // 'generated' | 'bach' | 'partimento'
     melody: false,       // also require the written pitch, not just the timing
-    hands: 'right',      // 'right' | 'both' -- 'both' adds the chorale's bass line
+    hands: 'right',      // 'right' | 'left' | 'both' -- 'both' adds the lower voice
+    pattern: 'thirds',   // which partimento figure, when that's the source
     vocabulary: 'eighths',
     rests: true,
     metronome: true,
 };
 
-// melodies only exist in the borrowed corpus, so melody mode implies a real passage
-function melodic() {
-    return rhythm_settings.melody && rhythm_settings.source === 'bach';
+function partimento_mode() {
+    return rhythm_settings.source === 'partimento';
 }
 
-// the bass line is only worth showing when its pitches are being asked for
+// melodies only exist in the borrowed corpus, so melody mode implies a real passage. A
+// partimento pattern needs no such switch -- there is nothing in one to practise but the
+// notes, so it is always pitched.
+function melodic() {
+    return partimento_mode() || (rhythm_settings.melody && rhythm_settings.source === 'bach');
+}
+
+// the lower line is only worth showing when its pitches are being asked for
 function two_handed() {
     return melodic() && rhythm_settings.hands === 'both';
 }
 
-// left hand alone: the bass becomes the one voice, read from a bass-clef staff
+// left hand alone: the lower voice becomes the one voice, read from a bass-clef staff
 function left_only() {
     return melodic() && rhythm_settings.hands === 'left';
 }
@@ -52,10 +59,23 @@ function total_beats() {
 
 // Timing tolerances, in seconds. Absolute rather than beat-relative on purpose: playing
 // "tightly" means the same wall-clock precision whether the tempo is 60 or 140.
-const PERFECT_WINDOW = 0.05;
-const GOOD_WINDOW = 0.12;
+const PERFECT_WINDOW = 0.03;
+const GOOD_WINDOW = 0.08; // the bar a note has to clear to be counted at all
 const MATCH_WINDOW = 0.28; // past this a tap isn't credited to that note at all
-const PASS_RATIO = 0.9;
+const PASS_RATIO = 0.95;
+
+// No window can be allowed to reach as far as the neighbouring note, though, or the
+// grader stops being able to tell which note a tap was aiming at: at 160bpm a sixteenth
+// lasts 94ms, so a flat 280ms match window spans three of them and a stray tap counts
+// against whichever it happens to drift nearest. Half the shortest note the passage uses
+// is the furthest a tap can sit from its own note and still be nearer to it than to the
+// next one, so every window is capped there. At ordinary tempos that limit is far wider
+// than the tolerances above and changes nothing -- it only bites where the notes are
+// genuinely arriving faster than the tolerance itself.
+function timing_window(seconds) {
+    const shortest_note = beat_duration() / current_rhythm.perBeat;
+    return Math.min(seconds, shortest_note / 2);
+}
 
 const DURATION_BEATS = { 'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25 };
 const VOCABULARY = {
@@ -502,8 +522,8 @@ function accuracy_for(beat, midi) {
         if (melodic() && !same_pitch_class(midi, onsetPitches[i])) return;
         nearest = Math.min(nearest, Math.abs(onset - beat) * beat_duration());
     });
-    if (nearest <= PERFECT_WINDOW) return 'perfect';
-    if (nearest <= GOOD_WINDOW) return 'good';
+    if (nearest <= timing_window(PERFECT_WINDOW)) return 'perfect';
+    if (nearest <= timing_window(GOOD_WINDOW)) return 'good';
     return 'off';
 }
 
@@ -517,9 +537,13 @@ function same_pitch_class(a, b) {
 // --- run loop -----------------------------------------------------------------
 
 function prompt_text() {
-    return melodic()
+    // the tolerance is the whole exercise, and it moves with the tempo and the note
+    // values -- saying what it is stops a near miss from looking arbitrary
+    const tolerance = ` · ±${Math.round(timing_window(GOOD_WINDOW) * 1000)}ms`;
+    if (partimento_mode()) return 'press start, then play the pattern as written' + tolerance;
+    return (melodic()
         ? 'press start, then play the notes as written'
-        : 'press start, then play the rhythm on any key';
+        : 'press start, then play the rhythm on any key') + tolerance;
 }
 
 function update_start_button() {
@@ -589,7 +613,8 @@ function start_rhythm_run() {
     // fire again, leaving the round stuck open forever. this timer ends the run
     // regardless. background setTimeout gets clamped to ~1s, which is late but still
     // unsticks it; whichever path fires first wins, since score_run clears the other.
-    const runSeconds = (rhythm_run_start - ctx.currentTime) + total_beats() * beatDur + MATCH_WINDOW;
+    const runSeconds = (rhythm_run_start - ctx.currentTime) + total_beats() * beatDur
+        + timing_window(MATCH_WINDOW);
     rhythm_end_timer = setTimeout(() => {
         if (rhythm_running) score_run();
     }, (runSeconds + 0.15) * 1000);
@@ -602,7 +627,7 @@ function animate_playhead() {
     const beat = (get_audio_context().currentTime - rhythm_run_start) / beat_duration();
 
     // keep listening a moment past the final beat so a slightly late last tap still counts
-    if (beat >= total_beats() + MATCH_WINDOW / beat_duration()) {
+    if (beat >= total_beats() + timing_window(MATCH_WINDOW) / beat_duration()) {
         score_run();
         return;
     }
@@ -651,6 +676,9 @@ function score_run() {
     update_start_button();
 
     const beatDur = beat_duration();
+    const matchWindow = timing_window(MATCH_WINDOW);
+    const goodWindow = timing_window(GOOD_WINDOW);
+    const perfectWindow = timing_window(PERFECT_WINDOW);
     const { onsets, onsetPitches } = current_rhythm;
     const claimed = new Set();
     let good = 0;
@@ -673,11 +701,11 @@ function score_run() {
             }
             if (diff < bestDiff) { bestDiff = diff; bestIndex = i; }
         });
-        if (bestIndex >= 0 && bestDiff <= MATCH_WINDOW) {
+        if (bestIndex >= 0 && bestDiff <= matchWindow) {
             claimed.add(bestIndex);
-            if (bestDiff <= GOOD_WINDOW) good++;
-            if (bestDiff <= PERFECT_WINDOW) perfect++;
-        } else if (bestWrongDiff <= GOOD_WINDOW) {
+            if (bestDiff <= goodWindow) good++;
+            if (bestDiff <= perfectWindow) perfect++;
+        } else if (bestWrongDiff <= goodWindow) {
             wrongNote++;
         }
     });
@@ -687,7 +715,7 @@ function score_run() {
     const ratio = onsets.length ? good / onsets.length : 0;
     const passed = ratio >= PASS_RATIO && extra <= allowedExtra;
 
-    // floored, not rounded: 26/29 rounds up to "90%" while still failing a 90% bar,
+    // floored, not rounded: 27/29 rounds up to "95%" while still failing a 95% bar,
     // which reads as a contradiction
     const pct = Math.floor(ratio * 100);
     const scored = melodic() ? 'right' : 'in time';
@@ -695,6 +723,11 @@ function score_run() {
     // worth separating out: hitting the beat but the wrong note is a different mistake
     // from being out of time, and the count alone wouldn't tell them apart
     const wrongNote_note = wrongNote > 0 ? ` · ${wrongNote} in time but wrong note` : '';
+    // taps that found their note but missed the window. Worth its own count now the
+    // window is tight: without it a take of all the right notes played a shade late
+    // reads as "0/32 right", which looks like the notes themselves were wrong.
+    const late = claimed.size - good;
+    const lateNote = late > 0 ? ` · ${late} near miss${late === 1 ? '' : 'es'}` : '';
     let message;
     if (passed) {
         message = `pass — ${good}/${onsets.length} ${scored} (${perfect} dead on)${extraNote}`;
@@ -702,7 +735,7 @@ function score_run() {
         // the notes themselves were fine; it was the stray taps that sank it
         message = `${good}/${onsets.length} ${scored}, but ${extra} extra tap${extra === 1 ? '' : 's'} — at most ${allowedExtra} allowed`;
     } else {
-        message = `${pct}% — ${good}/${onsets.length} ${scored}${wrongNote_note}${extraNote}, need ${Math.round(PASS_RATIO * 100)}%`;
+        message = `${pct}% — ${good}/${onsets.length} ${scored}${lateNote}${wrongNote_note}${extraNote}, need ${Math.round(PASS_RATIO * 100)}%`;
     }
     rhythm_feedback.textContent = message;
     rhythm_feedback.className = passed ? 'passed' : 'failed';
@@ -714,7 +747,10 @@ function score_run() {
 // --- wiring -------------------------------------------------------------------
 
 function next_rhythm() {
-    const passage = rhythm_settings.source === 'bach' ? bach_excerpt() : null;
+    let passage = null;
+    if (partimento_mode()) passage = partimento_passage();
+    else if (rhythm_settings.source === 'bach') passage = bach_excerpt();
+
     let note = '';
     if (rhythm_settings.source === 'bach' && !passage) {
         // no real passage runs that long -- say so rather than silently generating one
@@ -751,9 +787,11 @@ function stop_rhythm() { // handed to init_quiz so switching modes kills the run
     update_start_button();
 }
 
-// shared by both topic buttons -- they differ only in whether pitches are required
-function init_rhythm_panel() {
-    set_relevant_options([]); // its settings live inline above the score, not in a panel
+// shared by every topic button that draws into this panel. Most of them have nothing to
+// choose in the practice panel -- their settings live inline above the score -- but
+// partimento roots its patterns off the note pickers, so the sections are passed in.
+function init_rhythm_panel(sections = []) {
+    set_relevant_options(sections);
     canvas.style.display = 'none';
     init_quiz(next_rhythm, rhythm_callback, stop_rhythm);
     show_display('rhythm');
@@ -762,6 +800,10 @@ function init_rhythm_panel() {
 
 function init_rhythm() {
     rhythm_settings.melody = false; // this topic is timing only, whatever the source
+    // a partimento pattern is nothing but pitches, so it can't be left as the source of a
+    // timing-only round -- fall back to the generator
+    if (partimento_mode()) rhythm_settings.source = 'generated';
+    document.getElementById('rhythm_source').value = rhythm_settings.source;
     sync_generator_controls();
     init_rhythm_panel();
 }
@@ -821,6 +863,7 @@ function sync_generator_controls() {
     set_enabled('rhythm_rests', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
     set_enabled('rhythm_hands', melodic()); // only pitched practice has a left hand to play
+    set_enabled('rhythm_pattern', partimento_mode());
 }
 sync_generator_controls();
 
