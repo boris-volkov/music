@@ -13,12 +13,21 @@ const MEASURES_PER_LINE = 4;
 
 // score geometry, in px
 const SCORE_MARGIN = 10;
-const LINE_HEIGHT = 118;      // vertical distance from one system to the next
-const FIRST_LINE_TOP = 20;
+const FIRST_LINE_TOP = 20;    // baseline clearance above the first system
+const SYSTEM_GAP = 38;        // baseline clearance from one system's foot to the next one's head
 const STRIP_BASE_OFFSET = 14; // gap between the strip's underside and the staff's top line
 const STRIP_HEIGHT = 16;
 const PLAYHEAD_OVERHANG = 3;  // how far the playhead pokes out of the strip, top and bottom
 const GRAND_STAFF_GAP = 95;   // treble stave top to bass stave top, when both hands play
+const STAVE_TOP_INSET = 40;   // a stave's own y down to its top line -- VexFlow's fixed default
+const STAFF_HEIGHT = 40;      // a stave's own top line to bottom line -- VexFlow's fixed default
+// VexFlow always draws the brace a fixed distance to the left of the stave's own x,
+// whatever the gap between the staves -- reserve room for it or its curl gets clipped by
+// the canvas edge when the margin is otherwise this tight
+const BRACE_OVERHANG = 16;
+// however far a note's own reach (ledger lines, stems, accidentals) actually measures,
+// leave this much further clearance beyond it as breathing room
+const NOTE_OVERFLOW_MARGIN = 8;
 
 const rhythm_settings = {
     tempo: 80,
@@ -246,11 +255,6 @@ function upper_clef() {
     return left_only() ? 'bass' : 'treble';
 }
 
-// a grand staff needs room underneath each system for the bass staff
-function line_height() {
-    return two_handed() ? LINE_HEIGHT + GRAND_STAFF_GAP : LINE_HEIGHT;
-}
-
 // the middle line of the staff, in VexFlow key form -- rests sit here for whichever
 // clef they are being drawn on. Using a treble position ('b/4') unconditionally is what
 // caused a bass-staff rest to float several ledger lines up into the staff above it.
@@ -272,129 +276,224 @@ function build_stave_notes(measure, clef) {
     });
 }
 
+// Lays out and draws one line (system) of the score into `context` at `topY`, and
+// reports how far this line's own notes reach beyond their staff: above the top stave's
+// top line, below the bottom stave's bottom line, and -- on a grand staff -- into the
+// gap between the two staves. Ledger lines, stems and accidentals all vary with the
+// notes actually in play, so those distances aren't something to guess at from the clef
+// alone; they're read off the notes VexFlow just placed.
+//
+// None of the three depends on topY or grandGap -- shifting a stave down shifts its
+// notes down by exactly as much, so the distance between a note and its own stave line
+// never changes. That's what lets render_rhythm_score() measure every line once, at
+// whatever y and gap are convenient, and reuse the numbers to place the real ones.
+function layout_system(context, firstIndex, count, topY, leftMargin, usable, grand, keySignature, grandGap = GRAND_STAFF_GAP) {
+    const VF = Vex.Flow;
+    const staves = [];
+    const domains = [];
+
+    // a bass clef is wider than a treble one, so on a grand staff the roomier of the
+    // two sets the lead overhead -- otherwise the staves' note areas would start at
+    // different x and the two hands wouldn't line up vertically
+    const leadOverhead = Math.max(
+        stave_overhead(upper_clef(), firstIndex === 0, keySignature),
+        grand ? stave_overhead('bass', firstIndex === 0, keySignature) : 0
+    );
+    const plainOverhead = stave_overhead(null, false, null);
+
+    // every measure gets an identical note-area width, so the playhead keeps one
+    // constant speed across the whole line and no gap opens up at the barlines
+    const noteAreaWidth = (usable - leadOverhead) / count;
+
+    let upperTop = Infinity, upperBottom = -Infinity;
+    let lowerTop = Infinity, lowerBottom = -Infinity;
+    let upperTopLineY = null, upperBottomLineY = null, lowerTopLineY = null, bottomLineY = null;
+
+    let x = leftMargin;
+    for (let column = 0; column < count; column++) {
+        const mi = firstIndex + column;
+        let staveWidth;
+        if (count === 1) staveWidth = usable;
+        else if (column === 0) staveWidth = noteAreaWidth + leadOverhead - plainOverhead;
+        else if (column === count - 1) staveWidth = noteAreaWidth + plainOverhead;
+        else staveWidth = noteAreaWidth;
+
+        const stave = new VF.Stave(x, topY, staveWidth);
+        const bassStave = grand ? new VF.Stave(x, topY + grandGap, staveWidth) : null;
+
+        if (column === 0) { // clef and key signature repeat on each new line
+            stave.addClef(upper_clef());
+            if (keySignature) stave.addKeySignature(keySignature);
+            if (bassStave) {
+                bassStave.addClef('bass');
+                if (keySignature) bassStave.addKeySignature(keySignature);
+            }
+        }
+        if (mi === 0) {
+            stave.addTimeSignature('4/4');
+            if (bassStave) bassStave.addTimeSignature('4/4');
+        }
+
+        if (bassStave) { // force both note areas to begin together
+            const startX = Math.max(stave.getNoteStartX(), bassStave.getNoteStartX());
+            stave.setNoteStartX(startX);
+            bassStave.setNoteStartX(startX);
+        }
+
+        stave.setContext(context).draw();
+        if (bassStave) bassStave.setContext(context).draw();
+        staves.push(stave);
+
+        const start = stave.getNoteStartX();
+        domains.push({ start, end: start + noteAreaWidth });
+
+        const upperNotes = build_stave_notes(current_rhythm.measures[mi], upper_clef());
+        const lowerNotes = bassStave
+            ? build_stave_notes(current_rhythm.bass[mi], 'bass')
+            : null;
+
+        const voices = [];
+        const makeVoice = (notes) => {
+            const v = new VF.Voice({ num_beats: BEATS_PER_MEASURE, beat_value: 4 });
+            v.addTickables(notes);
+            voices.push(v);
+            return v;
+        };
+        const upperVoice = makeVoice(upperNotes);
+        const lowerVoice = lowerNotes ? makeVoice(lowerNotes) : null;
+
+        if (melodic()) {
+            // lets VexFlow work out which accidentals actually need printing given
+            // the key signature and what has already appeared in the bar
+            VF.Accidental.applyAccidentals(voices, keySignature);
+        }
+
+        const beams = VF.Beam.generateBeams(upperNotes)
+            .concat(lowerNotes ? VF.Beam.generateBeams(lowerNotes) : []);
+
+        // formatting both voices together is what keeps the hands aligned in time
+        const formatter = new VF.Formatter();
+        voices.forEach((v) => formatter.joinVoices([v]));
+        formatter.formatToStave(voices, stave);
+
+        upperVoice.setContext(context).setStave(stave).draw();
+        if (lowerVoice) lowerVoice.setContext(context).setStave(bassStave).draw();
+        beams.forEach((beam) => beam.setContext(context).draw());
+
+        if (bassStave) { // brace the system, and join the barlines between staves
+            const connector = column === 0 ? VF.StaveConnector.type.BRACE : null;
+            if (connector !== null) {
+                new VF.StaveConnector(stave, bassStave)
+                    .setType(connector).setContext(context).draw();
+            }
+            new VF.StaveConnector(stave, bassStave)
+                .setType(VF.StaveConnector.type.SINGLE_RIGHT).setContext(context).draw();
+            if (column === 0) {
+                new VF.StaveConnector(stave, bassStave)
+                    .setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
+            }
+        }
+
+        upperTopLineY = stave.getYForLine(0);
+        upperBottomLineY = stave.getYForLine(4);
+        if (bassStave) {
+            lowerTopLineY = bassStave.getYForLine(0);
+            bottomLineY = bassStave.getYForLine(4);
+        }
+        upperNotes.forEach((n) => {
+            const bb = n.getBoundingBox();
+            upperTop = Math.min(upperTop, bb.y);
+            upperBottom = Math.max(upperBottom, bb.y + bb.h);
+        });
+        if (lowerNotes) {
+            lowerNotes.forEach((n) => {
+                const bb = n.getBoundingBox();
+                lowerTop = Math.min(lowerTop, bb.y);
+                lowerBottom = Math.max(lowerBottom, bb.y + bb.h);
+            });
+        }
+
+        x += staveWidth;
+    }
+
+    const overflowAbove = Math.max(0, upperTopLineY - upperTop);
+    const overflowBelow = Math.max(0, (grand ? lowerBottom : upperBottom) - (grand ? bottomLineY : upperBottomLineY));
+    // how far the two hands' notes would reach into the gap between the staves --
+    // 0 whenever there's only one staff to begin with
+    const innerOverflow = grand
+        ? Math.max(0, (upperBottom - upperBottomLineY) + (lowerTopLineY - lowerTop))
+        : 0;
+
+    return { staves, domains, extent: { overflowAbove, overflowBelow, innerOverflow } };
+}
+
 function render_rhythm_score() {
     const VF = Vex.Flow;
     rhythm_score.innerHTML = '';
 
     const measureCount = current_rhythm.measures.length;
     const lineCount = Math.ceil(measureCount / MEASURES_PER_LINE);
+    const grand = two_handed();
+    const keySignature = melodic() ? current_rhythm.key : null;
 
     const width = rhythm_score.clientWidth || 880;
-    const renderer = new VF.Renderer(rhythm_score, VF.Renderer.Backends.SVG);
-    renderer.resize(width, FIRST_LINE_TOP + lineCount * line_height());
-    const context = renderer.getContext();
+    const leftMargin = SCORE_MARGIN + (grand ? BRACE_OVERHANG : 0);
+    const usable = width - leftMargin - SCORE_MARGIN;
 
-    const usable = width - SCORE_MARGIN * 2;
-    const grand = two_handed();
-    rhythm_staves = [];
-    rhythm_domains = [];
-
+    // Pass 1 (measurement): lay out every line into a throwaway, never-attached context.
+    // Where a line ends up drawn is just a vertical shift of where it's measured here, so
+    // the clearance it actually needs above and below itself can be read off this pass and
+    // reused untouched for the real one -- see layout_system() for why that holds.
+    const scratch = new VF.Renderer(document.createElement('div'), VF.Renderer.Backends.SVG);
+    scratch.resize(Math.max(width, 1), 1);
+    const scratchContext = scratch.getContext();
+    const extents = [];
     for (let line = 0; line < lineCount; line++) {
         const firstIndex = line * MEASURES_PER_LINE;
         const count = Math.min(MEASURES_PER_LINE, measureCount - firstIndex);
-        const keySignature = melodic() ? current_rhythm.key : null;
-        const topY = FIRST_LINE_TOP + line * line_height();
-
-        // a bass clef is wider than a treble one, so on a grand staff the roomier of the
-        // two sets the lead overhead -- otherwise the staves' note areas would start at
-        // different x and the two hands wouldn't line up vertically
-        const leadOverhead = Math.max(
-            stave_overhead(upper_clef(), line === 0, keySignature),
-            grand ? stave_overhead('bass', line === 0, keySignature) : 0
+        extents.push(
+            layout_system(scratchContext, firstIndex, count, 0, leftMargin, usable, grand, keySignature).extent
         );
-        const plainOverhead = stave_overhead(null, false, null);
+    }
 
-        // every measure gets an identical note-area width, so the playhead keeps one
-        // constant speed across the whole line and no gap opens up at the barlines
-        const noteAreaWidth = (usable - leadOverhead) / count;
+    // Pass 2: turn those measurements into a clearance above the first system, a gap
+    // before every later one, and a margin below the last one, then draw for real at the
+    // y's that come out of that -- nothing is left to guess, so nothing gets clipped.
+    //
+    // the grand-staff gap only grows past its default when the two hands would otherwise
+    // crowd each other in the middle of a system -- most systems keep the default
+    const grandGaps = extents.map((e) => grand
+        ? Math.max(GRAND_STAFF_GAP, STAFF_HEIGHT + e.innerOverflow + NOTE_OVERFLOW_MARGIN)
+        : GRAND_STAFF_GAP);
+    const topYs = [];
+    let cursor = 0;
+    for (let line = 0; line < lineCount; line++) {
+        const clearance = line === 0
+            ? Math.max(FIRST_LINE_TOP, extents[0].overflowAbove + NOTE_OVERFLOW_MARGIN)
+            : Math.max(SYSTEM_GAP, extents[line - 1].overflowBelow + extents[line].overflowAbove + NOTE_OVERFLOW_MARGIN);
+        cursor += clearance;
+        topYs[line] = cursor;
+        // how far this line's own bottom line sits below its staveY -- the bass stave's
+        // when grand, since that's the lower of the two
+        cursor += (grand ? grandGaps[line] : 0) + STAVE_TOP_INSET + STAFF_HEIGHT;
+    }
+    const lastExtent = extents[lineCount - 1];
+    const totalHeight = cursor + lastExtent.overflowBelow + NOTE_OVERFLOW_MARGIN;
 
-        let x = SCORE_MARGIN;
-        for (let column = 0; column < count; column++) {
-            const mi = firstIndex + column;
-            let staveWidth;
-            if (count === 1) staveWidth = usable;
-            else if (column === 0) staveWidth = noteAreaWidth + leadOverhead - plainOverhead;
-            else if (column === count - 1) staveWidth = noteAreaWidth + plainOverhead;
-            else staveWidth = noteAreaWidth;
+    const renderer = new VF.Renderer(rhythm_score, VF.Renderer.Backends.SVG);
+    renderer.resize(width, totalHeight);
+    const context = renderer.getContext();
 
-            const stave = new VF.Stave(x, topY, staveWidth);
-            const bassStave = grand ? new VF.Stave(x, topY + GRAND_STAFF_GAP, staveWidth) : null;
-
-            if (column === 0) { // clef and key signature repeat on each new line
-                stave.addClef(upper_clef());
-                if (keySignature) stave.addKeySignature(keySignature);
-                if (bassStave) {
-                    bassStave.addClef('bass');
-                    if (keySignature) bassStave.addKeySignature(keySignature);
-                }
-            }
-            if (mi === 0) {
-                stave.addTimeSignature('4/4');
-                if (bassStave) bassStave.addTimeSignature('4/4');
-            }
-
-            if (bassStave) { // force both note areas to begin together
-                const startX = Math.max(stave.getNoteStartX(), bassStave.getNoteStartX());
-                stave.setNoteStartX(startX);
-                bassStave.setNoteStartX(startX);
-            }
-
-            stave.setContext(context).draw();
-            if (bassStave) bassStave.setContext(context).draw();
-            rhythm_staves.push(stave);
-
-            const start = stave.getNoteStartX();
-            rhythm_domains.push({ start, end: start + noteAreaWidth });
-
-            const upperNotes = build_stave_notes(current_rhythm.measures[mi], upper_clef());
-            const lowerNotes = bassStave
-                ? build_stave_notes(current_rhythm.bass[mi], 'bass')
-                : null;
-
-            const voices = [];
-            const makeVoice = (notes) => {
-                const v = new VF.Voice({ num_beats: BEATS_PER_MEASURE, beat_value: 4 });
-                v.addTickables(notes);
-                voices.push(v);
-                return v;
-            };
-            const upperVoice = makeVoice(upperNotes);
-            const lowerVoice = lowerNotes ? makeVoice(lowerNotes) : null;
-
-            if (melodic()) {
-                // lets VexFlow work out which accidentals actually need printing given
-                // the key signature and what has already appeared in the bar
-                VF.Accidental.applyAccidentals(voices, keySignature);
-            }
-
-            const beams = VF.Beam.generateBeams(upperNotes)
-                .concat(lowerNotes ? VF.Beam.generateBeams(lowerNotes) : []);
-
-            // formatting both voices together is what keeps the hands aligned in time
-            const formatter = new VF.Formatter();
-            voices.forEach((v) => formatter.joinVoices([v]));
-            formatter.formatToStave(voices, stave);
-
-            upperVoice.setContext(context).setStave(stave).draw();
-            if (lowerVoice) lowerVoice.setContext(context).setStave(bassStave).draw();
-            beams.forEach((beam) => beam.setContext(context).draw());
-
-            if (bassStave) { // brace the system, and join the barlines between staves
-                const connector = column === 0 ? VF.StaveConnector.type.BRACE : null;
-                if (connector !== null) {
-                    new VF.StaveConnector(stave, bassStave)
-                        .setType(connector).setContext(context).draw();
-                }
-                new VF.StaveConnector(stave, bassStave)
-                    .setType(VF.StaveConnector.type.SINGLE_RIGHT).setContext(context).draw();
-                if (column === 0) {
-                    new VF.StaveConnector(stave, bassStave)
-                        .setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
-                }
-            }
-
-            x += staveWidth;
-        }
+    rhythm_staves = [];
+    rhythm_domains = [];
+    for (let line = 0; line < lineCount; line++) {
+        const firstIndex = line * MEASURES_PER_LINE;
+        const count = Math.min(MEASURES_PER_LINE, measureCount - firstIndex);
+        const { staves, domains } = layout_system(
+            context, firstIndex, count, topYs[line], leftMargin, usable, grand, keySignature, grandGaps[line]
+        );
+        rhythm_staves.push(...staves);
+        rhythm_domains.push(...domains);
     }
 
     draw_timing_strips();
