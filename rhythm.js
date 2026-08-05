@@ -229,13 +229,19 @@ function line_height() {
     return two_handed() ? LINE_HEIGHT + GRAND_STAFF_GAP : LINE_HEIGHT;
 }
 
+// the middle line of the staff, in VexFlow key form -- rests sit here for whichever
+// clef they are being drawn on. Using a treble position ('b/4') unconditionally is what
+// caused a bass-staff rest to float several ledger lines up into the staff above it.
+const CLEF_MIDDLE_LINE = { treble: 'b/4', bass: 'd/3', percussion: 'b/4' };
+
 function build_stave_notes(measure, clef) {
     const VF = Vex.Flow;
+    const restKey = CLEF_MIDDLE_LINE[clef];
     return measure.map((note) => {
         const options = {
             // rhythm-only notation parks every note on the middle line; melody mode puts
-            // it at its written pitch
-            keys: [melodic() && note.pitch ? pitch_to_vexkey(note.pitch) : 'b/4'],
+            // it at its written pitch, and a rest at the clef's own middle line
+            keys: [melodic() && note.pitch ? pitch_to_vexkey(note.pitch) : restKey],
             duration: note.rest ? note.duration + 'r' : note.duration,
             clef, // without this the bass staff would place notes as if it were treble
         };
