@@ -35,7 +35,11 @@ function toggleFullscreen() {
 // practice area rather than replacing it, so the keyboard and prompt stay visible while
 // settings are being changed.
 
-const menu_tabs = [...document.querySelectorAll('.menu_tab')];
+// [data-panel] excludes the fullscreen button -- it borrows .menu_tab for looks but
+// isn't a panel toggle, and including it here made every tab's dataset.panel lookup
+// below fail on it (no matching panel element), throwing partway through the forEach
+// and leaving every other tab's open/close logic dead.
+const menu_tabs = [...document.querySelectorAll('.menu_tab[data-panel]')];
 
 function open_options_panel(id) {
     menu_tabs.forEach((tab) => {
