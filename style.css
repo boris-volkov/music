@@ -16,6 +16,7 @@
 	--clay: #e8b5a0;
 	--clay-border: #d4a085;
 	--amber: #e8c468;
+	--amber-border: #d4ab4c;
 	--terracotta: #d97a6c;
 }
 
@@ -200,6 +201,15 @@ canvas {
 
 .topic_button.clay:hover {
 	background: var(--clay-border);
+}
+
+.topic_button.amber {
+	background: var(--amber);
+	border: 1px solid var(--amber-border);
+}
+
+.topic_button.amber:hover {
+	background: var(--amber-border);
 }
 
 .topic_button.active {

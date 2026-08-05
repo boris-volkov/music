@@ -149,6 +149,10 @@
                         <div class="menu_panel_header">Timing</div>
                         <div class="menu_panel_body" id = "menu_rhythm"></div>
                     </div>
+                    <div class="menu_panel">
+                        <div class="menu_panel_header">Partimento</div>
+                        <div class="menu_panel_body" id = "menu_partimento"></div>
+                    </div>
                 </div>
             </div>
             <div id = "right_column">
@@ -171,7 +175,12 @@
                             <select id = "rhythm_source">
                                 <option value="generated" selected>Generated</option>
                                 <option value="bach">Bach chorales</option>
+                                <option value="partimento">Partimento patterns</option>
                             </select>
+                        </label>
+                        <label>
+                            <span class="control_label">Pattern</span>
+                            <select id = "rhythm_pattern"></select>
                         </label>
                         <label>
                             <span class="control_label">Measures</span>
@@ -259,6 +268,7 @@
     <script src = "scale_degrees.js"></script>
     <script src = "bach_corpus.js"  ></script>
     <script src = "rhythm.js"       ></script>
+    <script src = "partimento.js"   ></script>
     <script src = "buttons.js"      ></script>
     <script src = "interval_ear_training.js"></script>
 
