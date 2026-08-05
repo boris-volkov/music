@@ -52,40 +52,6 @@ canvas {
 	gap: 20px;
 }
 
-/* Header */
-
-#header {
-	display: flex;
-	align-items: baseline;
-	gap: 8px;
-	padding-bottom: 12px;
-	border-bottom: 2px solid var(--line);
-}
-
-#header h1 {
-	margin: 0;
-	font-size: 24px;
-	font-weight: 700;
-	letter-spacing: 0.02em;
-}
-
-#full_screen {
-	margin-left: auto;
-	align-self: center;
-	background: transparent;
-	border: 1px solid var(--line);
-	color: var(--ink-soft);
-	border-radius: 5px;
-	padding: 6px 10px;
-	font-size: 14px;
-	cursor: pointer;
-	transition: background 0.15s;
-}
-
-#full_screen:hover {
-	background: var(--panel);
-}
-
 /* MIDI status indicator */
 
 #midi_status {
