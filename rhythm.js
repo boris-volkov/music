@@ -26,7 +26,6 @@ const rhythm_settings = {
     source: 'generated', // 'generated' | 'bach' | 'partimento'
     melody: false,       // also require the written pitch, not just the timing
     hands: 'right',      // 'right' | 'left' | 'both' -- 'both' adds the lower voice
-    pattern: 'thirds',   // which partimento figure, when that's the source
     vocabulary: 'eighths',
     rests: true,
     metronome: true,
@@ -759,6 +758,7 @@ function next_rhythm() {
             return;
         }
         passage = partimento_passage();
+        if (!passage) return; // it has already said which pool was left empty
     }
     else if (rhythm_settings.source === 'bach') passage = bach_excerpt();
 
@@ -874,7 +874,6 @@ function sync_generator_controls() {
     set_enabled('rhythm_rests', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
     set_enabled('rhythm_hands', melodic()); // only pitched practice has a left hand to play
-    set_enabled('rhythm_pattern', partimento_mode());
 }
 sync_generator_controls();
 

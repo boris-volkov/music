@@ -122,10 +122,23 @@ function degree_to_pitch(tonic, degree, octaveShift) {
 
 // --- building a passage -------------------------------------------------------
 
-function current_pattern() {
-    return PARTIMENTO_PATTERNS.find((p) => p.id === rhythm_settings.pattern)
-        || PARTIMENTO_PATTERNS[0];
-}
+// The patterns are chosen the same way the scales and chords are: a row of buttons in the
+// practice panel saying which are in the pool, and each new passage draws one of them.
+// Leaving one switched on is how you drill a single figure.
+//
+// Structure_Collection carries all of that already -- the buttons, the All button,
+// remembering what is active, and the nudge when everything has been switched off -- so
+// these ride on it with an empty note list. Nothing here maps onto keys of the keyboard,
+// which is all the note list is for, so hovering a pattern lights nothing.
+const partimento_types = new Structure_Collection('partimento_types',
+    PARTIMENTO_PATTERNS.map((pattern) => [pattern.name, []]));
+
+// the figure itself rides along on the button's structure, so a random pick comes back
+// ready to use instead of having to be looked back up by its label
+partimento_types.list.forEach((structure, i) => {
+    structure.pattern = PARTIMENTO_PATTERNS[i];
+    structure.button.title = PARTIMENTO_PATTERNS[i].detail;
+});
 
 function into_measures(notes_) {
     const measures = [];
@@ -136,11 +149,21 @@ function into_measures(notes_) {
 }
 
 function partimento_passage() {
-    const pattern = current_pattern();
-    // the same picker every other game roots itself off. It returns null only when the
-    // player has switched every note off -- it says so and opens the panel itself, and C
-    // keeps the score on screen in the meantime rather than blanking it.
-    const root = notes.get_random() || { name: 'C', number: 0 };
+    // A pattern and a root, each drawn from its own row in the practice panel, and either
+    // row can be emptied. get_random opens the panel and says so in the terminal, but the
+    // terminal isn't the surface on show in this mode -- so the reason is repeated where
+    // the player is actually looking, and no passage is built. Quietly falling back to
+    // some default would drill a figure or a key that had been deliberately switched off.
+    const chosen = partimento_types.get_random();
+    const root = notes.get_random();
+    if (!chosen || !root) {
+        rhythm_feedback.textContent =
+            `no ${!chosen ? 'patterns' : 'root notes'} selected — pick at least one in the practice panel`;
+        rhythm_feedback.className = 'failed';
+        return null;
+    }
+
+    const pattern = chosen.pattern;
     const tonic = tonic_from_note_name(root.name);
 
     const upper = [];
@@ -166,18 +189,12 @@ function partimento_passage() {
 
 // --- wiring -------------------------------------------------------------------
 
-const pattern_select = document.getElementById('rhythm_pattern');
-PARTIMENTO_PATTERNS.forEach((pattern) => {
-    const option = document.createElement('option');
-    option.value = pattern.id;
-    option.textContent = pattern.name;
-    option.title = pattern.detail;
-    pattern_select.appendChild(option);
-});
-pattern_select.value = rhythm_settings.pattern;
-
-pattern_select.addEventListener('change', (e) => {
-    rhythm_settings.pattern = e.target.value;
+// Changing the pool takes effect at once, the way the controls above the score do --
+// waiting for the next pass would leave you looking at a figure you have just switched
+// off. The buttons' own handlers sit on the buttons themselves, so by the time this
+// fires on the way up the new active set has already been settled.
+document.getElementById('partimento_types').addEventListener('pointerdown', (e) => {
+    if (e.target.tagName !== 'BUTTON' || !partimento_mode()) return;
     abort_run();
     next_rhythm();
 });
@@ -189,7 +206,8 @@ function init_partimento() {
     document.getElementById('rhythm_source').value = 'partimento';
     document.getElementById('rhythm_hands').value = 'both';
     sync_generator_controls();
-    init_rhythm_panel(['notes']); // the root of each pattern comes from the note pickers
+    // the roots come from the note pickers, the figures from their own row beneath them
+    init_rhythm_panel(['notes', 'partimento']);
 }
 
 add_game_button('Patterns', init_partimento, 'menu_partimento', 'amber');
