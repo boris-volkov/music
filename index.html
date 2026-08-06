@@ -29,6 +29,10 @@
                 <div class="selection_title">base notes of chords, intervals, and scales</div>
                 <div id = "note_types" class="selection"></div>
             </div>
+            <div class="choice_holder" data-section="note_reading">
+                <div class="selection_title">clef</div>
+                <div id = "note_clef_selection" class="selection"></div>
+            </div>
             <div class="choice_holder" data-section="intervals">
                 <div class="selection_title">intervals</div>
                 <div id = "interval_types" class="selection"></div>
@@ -178,16 +182,6 @@
                 </div>
                 <pre id = "terminal">Select a topic to begin.</pre>
                 <div id = "notation" style="display: none">
-                    <div id = "notation_controls">
-                        <label>
-                            <span class="control_label">Clef</span>
-                            <select id = "note_clef">
-                                <option value="treble" selected>Treble</option>
-                                <option value="bass">Bass</option>
-                                <option value="both">Both (alternating)</option>
-                            </select>
-                        </label>
-                    </div>
                     <div id = "notation_score"></div>
                 </div>
                 <div id = "rhythm_panel" style="display: none">

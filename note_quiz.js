@@ -11,11 +11,39 @@ let current_clef = 'treble';  // the clef THIS prompt is drawn in -- stays fixed
                                // changes when a new note is picked
 let next_alt_clef = 'treble'; // which clef "Both" hands out to the *next* new question
 
-const note_clef_select = document.getElementById('note_clef');
+// lives in panel_practice (data-section="note_reading") rather than beside the staff --
+// it's a standing preference like the note/chord/scale pickers next to it, not something
+// tied to whether notation happens to be on screen right now
+const CLEF_CHOICES = [
+    { value: 'treble', label: 'Treble' },
+    { value: 'bass', label: 'Bass' },
+    { value: 'both', label: 'Both (alternating)' },
+];
+let clef_setting = 'treble';
+const note_clef_selection = document.getElementById('note_clef_selection');
+const clef_buttons = CLEF_CHOICES.map(({ value, label }) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.classList.toggle('active', value === clef_setting);
+    button.addEventListener('pointerdown', () => select_clef(value));
+    note_clef_selection.appendChild(button);
+    return { value, button };
+});
+
+function select_clef(value) {
+    clef_setting = value;
+    clef_buttons.forEach((c) => c.button.classList.toggle('active', c.value === clef_setting));
+    // changing the clef mid-question redraws the same note rather than skipping to a new
+    // one -- the player hasn't answered it yet, so there's nothing to advance past
+    if (current_quiz_callback === note_callback && note) {
+        current_clef = pick_clef();
+        show_note_prompt();
+    }
+}
 
 function pick_clef() {
-    const setting = note_clef_select.value;
-    if (setting !== 'both') return setting;
+    if (clef_setting !== 'both') return clef_setting;
     const clef = next_alt_clef;
     next_alt_clef = next_alt_clef === 'treble' ? 'bass' : 'treble'; // strict alternation
     return clef;
@@ -40,18 +68,9 @@ function random_note(){
 const note_callback = make_single_note_callback(() => note.number % 12, random_note);
 
 function init_note(){
-    set_relevant_options(['notes']);
+    set_relevant_options(['notes', 'note_reading']);
     canvas.style.display = 'none';
     init_quiz(random_note, note_callback);
 }
-
-// changing the clef mid-question redraws the same note rather than skipping to a new one --
-// the player hasn't answered yet, so there's nothing to advance past
-note_clef_select.addEventListener('change', () => {
-    if (current_quiz_callback === note_callback && note) {
-        current_clef = pick_clef();
-        show_note_prompt();
-    }
-});
 
 add_game_button('Notes', init_note, 'menu_base_notes', 'teal');

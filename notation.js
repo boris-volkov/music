@@ -7,8 +7,7 @@ let notation_enabled = false;
 const notation_toggle = document.getElementById('notation_toggle');
 const notation_panel = document.getElementById('notation');       // the whole display surface
 const notation_score = document.getElementById('notation_score'); // just the VexFlow target --
-// kept separate from notation_panel so redrawing the staff never touches notation_controls,
-// which lives in the same panel (see index.html)
+// kept as its own child of notation_panel so a redraw only ever clears the staff itself
 const vexflow_available = typeof Vex !== 'undefined' && !!Vex.Flow;
 
 if (!vexflow_available) {
