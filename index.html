@@ -177,7 +177,19 @@
                     <button id = "replay_button" style="display: none">&#9834; REPLAY</button>
                 </div>
                 <pre id = "terminal">Select a topic to begin.</pre>
-                <div id = "notation" style="display: none"></div>
+                <div id = "notation" style="display: none">
+                    <div id = "notation_controls">
+                        <label>
+                            <span class="control_label">Clef</span>
+                            <select id = "note_clef">
+                                <option value="treble" selected>Treble</option>
+                                <option value="bass">Bass</option>
+                                <option value="both">Both (alternating)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div id = "notation_score"></div>
+                </div>
                 <div id = "rhythm_panel" style="display: none">
                     <div id = "rhythm_controls">
                         <button id = "rhythm_start">&#9658; START</button>
