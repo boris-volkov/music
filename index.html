@@ -19,6 +19,7 @@
             <button class="menu_tab" data-panel="panel_practice">&#9881; Practice</button>
             <button class="menu_tab" data-panel="panel_audio">&#9835; Audio</button>
             <button class="menu_tab" data-panel="panel_controls">&#9000; Controls</button>
+            <button id = "rhythm_note_types_tab" class="menu_tab" data-panel="panel_rhythm_notes" disabled>&#9834; Note Types</button>
             <button id = "notation_toggle" title="Toggle musical notation">&#9834; Notation</button>
             <span id = "midi_status" title="MIDI access status">●</span>
         </div>
@@ -130,6 +131,14 @@
             </div>
         </div>
 
+        <div id = "panel_rhythm_notes" class="option_panel" style="display: none">
+            <div class="choice_holder">
+                <div class="selection_title">note types</div>
+                <div id = "rhythm_duration_selection" class="selection"></div>
+                <div id = "rhythm_duration_empty_note">Only shapes Generated rhythms -- set Rhythms to Generated above to use this.</div>
+            </div>
+        </div>
+
         <div id = "app_grid">
             <div id = "left_column">
                 <div id = "game_choices">
@@ -188,14 +197,6 @@
                                 <option value="16">16</option>
                             </select>
                         </label>
-                        <label>
-                            <span class="control_label">Notes</span>
-                            <select id = "rhythm_vocabulary">
-                                <option value="quarters">Quarters</option>
-                                <option value="eighths" selected>Eighths</option>
-                                <option value="sixteenths">Sixteenths</option>
-                            </select>
-                        </label>
                         <label class="checkbox_label">
                             <input type="checkbox" id = "rhythm_rests" checked>
                             <span class="control_label">Rests</span>
@@ -203,10 +204,6 @@
                         <label class="checkbox_label">
                             <input type="checkbox" id = "rhythm_ties" checked>
                             <span class="control_label">Ties</span>
-                        </label>
-                        <label class="checkbox_label">
-                            <input type="checkbox" id = "rhythm_dots" checked>
-                            <span class="control_label">Dots</span>
                         </label>
                         <label>
                             <span class="control_label">Hands</span>

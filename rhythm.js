@@ -35,10 +35,13 @@ const rhythm_settings = {
     source: 'generated', // 'generated' | 'bach' | 'partimento'
     melody: false,       // also require the written pitch, not just the timing
     hands: 'right',      // 'right' | 'left' | 'both' -- 'both' adds the lower voice
-    vocabulary: 'eighths',
+    // which duration codes generate_measure() is allowed to place -- see DURATION_TYPES for
+    // what each code means. Starts minimal (quarters and halves only, the two values a
+    // first-time player already knows) rather than the old "Eighths" tier's whole spread --
+    // the note-types panel is exactly where a more advanced player turns the rest on.
+    durations: { w: false, h: true, hd: false, q: true, qd: false, '8': false, '8d': false, '16': false },
     rests: true,
     ties: true,          // let an off-the-beat note tie across the beat instead of stopping at it
-    dots: true,          // allow the dotted-note figures the vocabulary supports (see VOCABULARY)
     metronome: true,
 };
 
@@ -96,11 +99,27 @@ const DURATION_BEATS = {
     'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25,
     'hd': 3, 'qd': 1.5, '8d': 0.75,
 };
-const VOCABULARY = {
-    quarters:   ['h', 'q'],
-    eighths:    ['h', 'q', '8', 'qd', 'hd'],
-    sixteenths: ['q', '8', '16', 'qd', '8d', 'hd'],
-};
+// every duration the note-types panel offers a toggle for, longest first -- this is the
+// one place their display order and label text live, so the panel is built from it rather
+// than hand-written to match
+const DURATION_TYPES = [
+    { code: 'w', label: 'Whole' },
+    { code: 'h', label: 'Half' },
+    { code: 'hd', label: 'Dotted half' },
+    { code: 'q', label: 'Quarter' },
+    { code: 'qd', label: 'Dotted quarter' },
+    { code: '8', label: 'Eighth' },
+    { code: '8d', label: 'Dotted eighth' },
+    { code: '16', label: 'Sixteenth' },
+];
+
+function enabled_durations() {
+    return DURATION_TYPES.map((d) => d.code).filter((code) => rhythm_settings.durations[code]);
+}
+
+// the note-types panel refuses to switch off the last of these three -- see fillable()
+// below for why a beat can always be completed as long as one of them stays on
+const ESSENTIAL_DURATIONS = ['q', '8', '16'];
 
 let current_rhythm = null;
 let rhythm_staves = [];
@@ -155,13 +174,18 @@ function push_note(measure, duration) {
     measure.push({ duration, rest });
 }
 
-// a dotted code is never selectable on its own -- only ever as VOCABULARY listing it, and
-// then still gated by the Dots setting, same as Rests/Ties gate the plain settings-driven
-// choices elsewhere. Keeping that check in one place means every spot that consults
-// VOCABULARY for a dotted code -- the spanning branch in generate_measure() and the split
-// below -- agrees on when one is actually legal.
-function dot_allowed(code) {
-    return !code.endsWith('d') || rhythm_settings.dots;
+// can a cell this size ever be filled at all with the enabled durations -- either it has
+// a code of its own (a plain "keep it whole" cell), or it can be split and each half is
+// itself fillable. Recursing on just one half is enough: both halves are the same size
+// drawing from the same pool, so if one works the other does too. This is what makes
+// fill_beat() safe to call with, say, only sixteenths enabled and no eighths -- a bare
+// pool.includes(CELL_DURATION[half]) check would've missed that a beat is still fillable
+// two levels down, and silently reached for a plain quarter instead, ignoring what was
+// actually turned on.
+function fillable(cellBeats, pool) {
+    if (pool.includes(CELL_DURATION[cellBeats])) return true;
+    const half = cellBeats / 2;
+    return CELL_DURATION[half] !== undefined && fillable(half, pool);
 }
 
 // the one dotted shape short enough to fit inside a single beat: a dotted note plus the
@@ -172,8 +196,8 @@ const DOTTED_SPLIT = { 1: ['8d', '16'] }; // cellBeats -> [dotted code, plain co
 const DOT_SPLIT_CHANCE = 0.18; // vs. this cell's regular shape, when a dotted split is legal
 const DOT_LONG_FIRST_CHANCE = 0.7; // dotted-note-then-plain vs. the reverse, once dotted is chosen
 
-// fills exactly one beat-or-smaller cell: leaves it whole when the vocabulary has that
-// value, or splits it into two equal halves and recurses -- so a beat only ever comes
+// fills exactly one beat-or-smaller cell: leaves it whole when a code for that exact size
+// is enabled, or splits it into two equal halves and recurses -- so a beat only ever comes
 // out as one of the standard subdivisions (q, or 8+8, or 8+16+16, or 16x4, ...) -- or,
 // occasionally, splits unevenly into a dotted note and its complement (8d+16, or the
 // reverse). Putting the short note first there starts the dotted note off the beat, which
@@ -181,7 +205,7 @@ const DOT_LONG_FIRST_CHANCE = 0.7; // dotted-note-then-plain vs. the reverse, on
 // and idiomatic figure, and falls out of this for free rather than needing its own case.
 function fill_beat(measure, pool, cellBeats) {
     const dotted = DOTTED_SPLIT[cellBeats];
-    const canDotSplit = dotted && dot_allowed(dotted[0]) && pool.includes(dotted[0]) && pool.includes(dotted[1]);
+    const canDotSplit = dotted && pool.includes(dotted[0]) && pool.includes(dotted[1]);
     if (canDotSplit && Math.random() < DOT_SPLIT_CHANCE) {
         const order = Math.random() < DOT_LONG_FIRST_CHANCE ? dotted : [dotted[1], dotted[0]];
         order.forEach((duration) => push_note(measure, duration));
@@ -191,13 +215,19 @@ function fill_beat(measure, pool, cellBeats) {
     const whole = CELL_DURATION[cellBeats];
     const half = cellBeats / 2;
     const canKeep = pool.includes(whole);
-    const canSplit = pool.includes(CELL_DURATION[half]);
+    const canSplit = CELL_DURATION[half] !== undefined && fillable(half, pool);
 
     if (canSplit && (!canKeep || Math.random() > KEEP_WHOLE_CHANCE)) {
         fill_beat(measure, pool, half);
         fill_beat(measure, pool, half);
-    } else {
+    } else if (canKeep) {
         push_note(measure, whole);
+    } else {
+        // structurally impossible with what's enabled -- the note-types panel guarantees
+        // at least one of quarter/eighth/sixteenth always stays on, which guarantees this
+        // is always reachable, so getting here means that guarantee broke somewhere. Fail
+        // loudly rather than silently placing a note outside what the player selected.
+        throw new Error(`no enabled duration can fill a ${cellBeats}-beat cell`);
     }
 }
 
@@ -227,9 +257,17 @@ function add_ties(measure) {
 }
 
 function generate_measure() {
-    const pool = VOCABULARY[rhythm_settings.vocabulary];
-    const spanning = Object.keys(DURATION_BEATS)
-        .filter((d) => DURATION_BEATS[d] > 1 && pool.includes(d) && dot_allowed(d));
+    const pool = enabled_durations();
+    // a spanning note whose length isn't a whole number of beats (only the dotted quarter,
+    // at 1.5) leaves a fractional remainder behind for fill_beat() to pick up afterwards
+    // (see below) -- so it's only actually usable if that leftover is itself fillable.
+    // Enabling the dotted quarter without also enabling an eighth or sixteenth to close out
+    // its remainder would otherwise be a selection this function could never honour.
+    const spanning = Object.keys(DURATION_BEATS).filter((d) => {
+        if (DURATION_BEATS[d] <= 1 || !pool.includes(d)) return false;
+        const remainder = DURATION_BEATS[d] % 1;
+        return remainder === 0 || fillable(remainder, pool);
+    });
     const measure = [];
     let beat = 0;
 
@@ -1149,7 +1187,8 @@ function stop_rhythm() { // handed to init_quiz so switching modes kills the run
 function init_rhythm_panel(sections = []) {
     set_relevant_options(sections);
     canvas.style.display = 'none';
-    init_quiz(next_rhythm, rhythm_callback, stop_rhythm);
+    init_quiz(next_rhythm, rhythm_callback, stop_rhythm); // disables the note-types tab too; undone below
+    rhythm_note_types_tab.disabled = false; // only Rhythm/Melody have any use for it
     show_display('rhythm');
     render_rhythm_score(); // re-render now the panel is visible and has a real width
 }
@@ -1195,11 +1234,6 @@ document.getElementById('rhythm_hands').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-document.getElementById('rhythm_vocabulary').addEventListener('change', (e) => {
-    rhythm_settings.vocabulary = e.target.value;
-    next_rhythm();
-});
-
 document.getElementById('rhythm_rests').addEventListener('change', (e) => {
     rhythm_settings.rests = e.target.checked;
     next_rhythm();
@@ -1210,14 +1244,54 @@ document.getElementById('rhythm_ties').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-document.getElementById('rhythm_dots').addEventListener('change', (e) => {
-    rhythm_settings.dots = e.target.checked;
-    next_rhythm();
+// --- note types panel -----------------------------------------------------------------
+// Replaces the old three-tier Quarters/Eighths/Sixteenths preset with direct control over
+// every duration individually, so a future round can, say, drill dotted quarters without
+// also pulling in sixteenths. Built from DURATION_TYPES rather than hand-written so the
+// panel can't drift out of sync with what generate_measure() actually knows how to place.
+
+const rhythm_note_types_tab = document.getElementById('rhythm_note_types_tab');
+const rhythm_duration_selection = document.getElementById('rhythm_duration_selection');
+const rhythm_duration_empty_note = document.getElementById('rhythm_duration_empty_note');
+
+const duration_buttons = DURATION_TYPES.map(({ code, label }) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('pointerdown', () => toggle_duration(code));
+    rhythm_duration_selection.appendChild(button);
+    return { code, button };
 });
 
-// note vocabulary, rests, ties and dots only shape generated rhythms, and melody practice
-// can only come from a real passage -- grey out whichever don't apply rather than letting
-// them look effective
+function toggle_duration(code) {
+    const entry = duration_buttons.find((d) => d.code === code);
+    if (entry.button.disabled) return; // the last of quarter/eighth/sixteenth -- see below
+    rhythm_settings.durations[code] = !rhythm_settings.durations[code];
+    sync_duration_buttons();
+    next_rhythm();
+}
+
+// keeps every button's pressed look in sync with the setting, and locks whichever of
+// quarter/eighth/sixteenth is the last one left on -- fill_beat() always has one of those
+// three as its unsplittable base case (see fillable()), so letting all three go dark would
+// leave a full beat with no legal way to fill it at all.
+function sync_duration_buttons() {
+    const essentialOn = ESSENTIAL_DURATIONS.filter((code) => rhythm_settings.durations[code]);
+    duration_buttons.forEach(({ code, button }) => {
+        const active = rhythm_settings.durations[code];
+        button.classList.toggle('active', active);
+        const isLastEssential = ESSENTIAL_DURATIONS.includes(code) && active && essentialOn.length === 1;
+        button.disabled = isLastEssential;
+        button.title = isLastEssential
+            ? 'at least one of quarter, eighth or sixteenth has to stay on, or a beat could never be filled'
+            : '';
+    });
+}
+sync_duration_buttons();
+
+// note types, rests and ties only shape generated rhythms, and melody practice can only
+// come from a real passage -- grey out (or, for the note-types panel, swap for an
+// explanatory note) whichever don't apply rather than letting them look effective
 function sync_generator_controls() {
     const generated = rhythm_settings.source === 'generated';
     const set_enabled = (id, enabled) => {
@@ -1225,12 +1299,14 @@ function sync_generator_controls() {
         input.disabled = !enabled;
         input.closest('label').classList.toggle('disabled', !enabled);
     };
-    set_enabled('rhythm_vocabulary', generated && !melodic());
     set_enabled('rhythm_rests', generated && !melodic());
     set_enabled('rhythm_ties', generated && !melodic());
-    set_enabled('rhythm_dots', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
     set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
+
+    const durationsApply = generated && !melodic();
+    rhythm_duration_selection.style.display = durationsApply ? 'flex' : 'none';
+    rhythm_duration_empty_note.style.display = durationsApply ? 'none' : 'block';
 
     // ...and while partimento is up the control is pinned to Both, not merely greyed:
     // a disabled select still reading "Left" would be describing an exercise that is

@@ -10,6 +10,15 @@ function init_quiz(starter, callback, cleanup = null){ // sending both funcs suc
     reset_display(); // clears any stale notation panel left over from a previous mode
     // only modes that play something for you get a replay button; they re-show it after
     document.getElementById('replay_button').style.display = 'none';
+    // the note-types tab only has anything to offer on the Rhythm/Melody topics -- default
+    // it closed and disabled on every switch, same as set_relevant_options() does for the
+    // Practice tab; init_rhythm_panel() (in rhythm.js) turns it back on when the switch is
+    // into one of those two
+    const noteTypesTab = document.getElementById('rhythm_note_types_tab');
+    if (noteTypesTab) {
+        if (noteTypesTab.classList.contains('active')) optionsOff();
+        noteTypesTab.disabled = true;
+    }
     starter();
     current_quiz_callback = callback;
     bindMidiInputs(); // safe even if midi isn't ready yet or no keyboard is plugged in
