@@ -38,6 +38,7 @@ const rhythm_settings = {
     vocabulary: 'eighths',
     rests: true,
     ties: true,          // let an off-the-beat note tie across the beat instead of stopping at it
+    dots: true,          // allow the dotted-note figures the vocabulary supports (see VOCABULARY)
     metronome: true,
 };
 
@@ -89,11 +90,16 @@ function timing_window(seconds) {
     return Math.min(seconds, shortest_note / 2);
 }
 
-const DURATION_BEATS = { 'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25 };
+// dotted codes are the plain code plus 'd' -- VexFlow accepts that suffixed form directly
+// (see build_stave_notes()), so there's no separate naming scheme to keep in sync
+const DURATION_BEATS = {
+    'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25,
+    'hd': 3, 'qd': 1.5, '8d': 0.75,
+};
 const VOCABULARY = {
     quarters:   ['h', 'q'],
-    eighths:    ['h', 'q', '8'],
-    sixteenths: ['q', '8', '16'],
+    eighths:    ['h', 'q', '8', 'qd', 'hd'],
+    sixteenths: ['q', '8', '16', 'qd', '8d', 'hd'],
 };
 
 let current_rhythm = null;
@@ -149,10 +155,39 @@ function push_note(measure, duration) {
     measure.push({ duration, rest });
 }
 
+// a dotted code is never selectable on its own -- only ever as VOCABULARY listing it, and
+// then still gated by the Dots setting, same as Rests/Ties gate the plain settings-driven
+// choices elsewhere. Keeping that check in one place means every spot that consults
+// VOCABULARY for a dotted code -- the spanning branch in generate_measure() and the split
+// below -- agrees on when one is actually legal.
+function dot_allowed(code) {
+    return !code.endsWith('d') || rhythm_settings.dots;
+}
+
+// the one dotted shape short enough to fit inside a single beat: a dotted note plus the
+// plain note that makes up the rest of the beat, 3 parts to 1. Longer dotted values
+// (dotted quarter, dotted half) cross the beat the same way a plain half or whole note
+// does -- see the spanning-note branch in generate_measure() -- so they never appear here.
+const DOTTED_SPLIT = { 1: ['8d', '16'] }; // cellBeats -> [dotted code, plain code]
+const DOT_SPLIT_CHANCE = 0.18; // vs. this cell's regular shape, when a dotted split is legal
+const DOT_LONG_FIRST_CHANCE = 0.7; // dotted-note-then-plain vs. the reverse, once dotted is chosen
+
 // fills exactly one beat-or-smaller cell: leaves it whole when the vocabulary has that
 // value, or splits it into two equal halves and recurses -- so a beat only ever comes
-// out as one of the standard subdivisions (q, or 8+8, or 8+16+16, or 16x4, ...)
+// out as one of the standard subdivisions (q, or 8+8, or 8+16+16, or 16x4, ...) -- or,
+// occasionally, splits unevenly into a dotted note and its complement (8d+16, or the
+// reverse). Putting the short note first there starts the dotted note off the beat, which
+// is exactly what add_ties() looks for -- a dotted-note-tied-into-the-next-beat is a real
+// and idiomatic figure, and falls out of this for free rather than needing its own case.
 function fill_beat(measure, pool, cellBeats) {
+    const dotted = DOTTED_SPLIT[cellBeats];
+    const canDotSplit = dotted && dot_allowed(dotted[0]) && pool.includes(dotted[0]) && pool.includes(dotted[1]);
+    if (canDotSplit && Math.random() < DOT_SPLIT_CHANCE) {
+        const order = Math.random() < DOT_LONG_FIRST_CHANCE ? dotted : [dotted[1], dotted[0]];
+        order.forEach((duration) => push_note(measure, duration));
+        return;
+    }
+
     const whole = CELL_DURATION[cellBeats];
     const half = cellBeats / 2;
     const canKeep = pool.includes(whole);
@@ -193,11 +228,23 @@ function add_ties(measure) {
 
 function generate_measure() {
     const pool = VOCABULARY[rhythm_settings.vocabulary];
-    const spanning = Object.keys(DURATION_BEATS).filter((d) => DURATION_BEATS[d] > 1 && pool.includes(d));
+    const spanning = Object.keys(DURATION_BEATS)
+        .filter((d) => DURATION_BEATS[d] > 1 && pool.includes(d) && dot_allowed(d));
     const measure = [];
     let beat = 0;
 
     while (beat < BEATS_PER_MEASURE - 1e-9) {
+        // a dotted quarter (1.5 beats) is the one spanning note whose length isn't a
+        // whole number of beats, so placing one leaves `beat` sitting mid-beat -- close
+        // out just that remainder before the next full-beat decision, the same way any
+        // other off-beat fragment gets filled, rather than letting fill_beat(1) start
+        // from an unaligned position and straddle the next boundary by accident
+        const toNextBeat = Math.ceil(beat - 1e-9) - beat;
+        if (toNextBeat > 1e-9) {
+            fill_beat(measure, pool, toNextBeat);
+            beat += toNextBeat;
+            continue;
+        }
         const remaining = BEATS_PER_MEASURE - beat;
         const fits = spanning.filter((d) => DURATION_BEATS[d] <= remaining + 1e-9);
         if (fits.length && Math.random() < SPAN_BEATS_CHANCE) {
@@ -213,9 +260,25 @@ function generate_measure() {
     return measure;
 }
 
+// the smallest number of equal slices a beat needs so this one note's duration comes out
+// to a whole number of slices. Every duration this file produces is a multiple of a
+// sixteenth note, so quartering the beat is always fine enough -- this just finds the
+// coarsest grid that still works, rather than assuming the finest one is always needed.
+// (A plain "shortest duration present" heuristic gets this wrong for a dotted note: a
+// dotted eighth is 0.75 of a beat, longer than a bare sixteenth, but still lands on
+// sixteenth-note ground and needs that same quarter-of-a-beat grid to be marked correctly.)
+function beat_denominator(duration) {
+    const beats = DURATION_BEATS[duration];
+    for (const n of [1, 2, 4]) {
+        if (Math.abs(beats * n - Math.round(beats * n)) < 1e-9) return n;
+    }
+    return 4;
+}
+
 // walks the measures assigning each note its absolute beat, and collects the onsets the
 // player is expected to tap. also settles how finely the timing strip has to be divided:
-// the grid needs a line at every possible onset, which is the shortest value in use.
+// the grid needs a line at every possible onset, which is set by whichever note in the
+// passage demands the finest one.
 function finish_rhythm(measures, attribution = null, key = null, bass = null) {
     // walk a voice, stamping each note with its absolute beat and collecting what the
     // player has to hit. with two hands both voices contribute to the same target list.
@@ -244,8 +307,7 @@ function finish_rhythm(measures, attribution = null, key = null, bass = null) {
     targets.sort((a, b) => a.beat - b.beat);
 
     const allNotes = measures.flat().concat(bass ? bass.flat() : []);
-    const shortest = Math.min(...allNotes.map((n) => DURATION_BEATS[n.duration]));
-    const perBeat = Math.max(1, Math.round(1 / Math.min(shortest, 1)));
+    const perBeat = Math.max(1, ...allNotes.map((n) => beat_denominator(n.duration)));
 
     return {
         measures,
@@ -406,7 +468,13 @@ function build_stave_notes(measure, clef) {
             clef, // without this the bass staff would place notes as if it were treble
         };
         if (!melodic()) options.stem_direction = 1; // uniform stems read as a rhythm
-        return new VF.StaveNote(options);
+        const staveNote = new VF.StaveNote(options);
+        // the 'd' suffix alone (e.g. "qd") already gives the note its correct duration --
+        // VexFlow just doesn't draw the augmentation dot glyph for that on its own, so it
+        // has to be attached as its own step, and before formatting or nothing reserves
+        // the space for it
+        if (note.duration.endsWith('d')) VF.Dot.buildAndAttach([staveNote], { all: true });
+        return staveNote;
     });
 }
 
@@ -1142,8 +1210,13 @@ document.getElementById('rhythm_ties').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-// note vocabulary, rests and ties only shape generated rhythms, and melody practice can
-// only come from a real passage -- grey out whichever don't apply rather than letting
+document.getElementById('rhythm_dots').addEventListener('change', (e) => {
+    rhythm_settings.dots = e.target.checked;
+    next_rhythm();
+});
+
+// note vocabulary, rests, ties and dots only shape generated rhythms, and melody practice
+// can only come from a real passage -- grey out whichever don't apply rather than letting
 // them look effective
 function sync_generator_controls() {
     const generated = rhythm_settings.source === 'generated';
@@ -1155,6 +1228,7 @@ function sync_generator_controls() {
     set_enabled('rhythm_vocabulary', generated && !melodic());
     set_enabled('rhythm_rests', generated && !melodic());
     set_enabled('rhythm_ties', generated && !melodic());
+    set_enabled('rhythm_dots', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
     set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
 
