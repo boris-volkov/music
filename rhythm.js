@@ -40,7 +40,10 @@ const rhythm_settings = {
     // first-time player already knows) rather than the old "Eighths" tier's whole spread --
     // the note-types panel is exactly where a more advanced player turns the rest on.
     durations: { w: false, h: true, hd: false, q: true, qd: false, '8': false, '8d': false, '16': false },
-    rests: true,
+    // which duration codes are allowed to come out silent -- same idea as durations above,
+    // and the same starting set, so a rest never shows up in a value the player hasn't
+    // even met as a sounding note yet
+    restDurations: { w: false, h: true, hd: false, q: true, qd: false, '8': false, '8d': false, '16': false },
     ties: true,          // let an off-the-beat note tie across the beat instead of stopping at it
     metronome: true,
 };
@@ -169,8 +172,11 @@ const SPAN_BEATS_CHANCE = 0.35; // vs. filling one beat at a time, when a bigger
 const REST_CHANCE = 0.18;
 
 function push_note(measure, duration) {
-    // never open on a rest -- there'd be nothing to anchor the first beat against
-    const rest = rhythm_settings.rests && measure.length > 0 && Math.random() < REST_CHANCE;
+    // never open on a rest -- there'd be nothing to anchor the first beat against. beyond
+    // that, a slot can only turn into a rest if this exact duration's rest is switched on --
+    // the shape of the measure is still decided purely by which note durations are enabled
+    // (see enabled_durations()); this just decides whether this particular slot stays silent
+    const rest = measure.length > 0 && rhythm_settings.restDurations[duration] && Math.random() < REST_CHANCE;
     measure.push({ duration, rest });
 }
 
@@ -1234,47 +1240,60 @@ document.getElementById('rhythm_hands').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-document.getElementById('rhythm_rests').addEventListener('change', (e) => {
-    rhythm_settings.rests = e.target.checked;
-    next_rhythm();
-});
-
-document.getElementById('rhythm_ties').addEventListener('change', (e) => {
-    rhythm_settings.ties = e.target.checked;
-    next_rhythm();
-});
-
 // --- note types panel -----------------------------------------------------------------
-// Replaces the old three-tier Quarters/Eighths/Sixteenths preset with direct control over
-// every duration individually, so a future round can, say, drill dotted quarters without
-// also pulling in sixteenths. Built from DURATION_TYPES rather than hand-written so the
-// panel can't drift out of sync with what generate_measure() actually knows how to place.
+// Replaces the old three-tier Quarters/Eighths/Sixteenths preset, plus the separate Rests
+// and Ties checkboxes, with direct control over every duration individually -- so a future
+// round can, say, drill dotted quarters without also pulling in sixteenths, or allow
+// quarter rests without eighth ones. Built from DURATION_TYPES rather than hand-written so
+// the panel can't drift out of sync with what generate_measure() actually knows how to place.
 
 const rhythm_note_types_tab = document.getElementById('rhythm_note_types_tab');
 const rhythm_duration_selection = document.getElementById('rhythm_duration_selection');
+const rhythm_rest_selection = document.getElementById('rhythm_rest_selection');
+const rhythm_tie_selection = document.getElementById('rhythm_tie_selection');
 const rhythm_duration_empty_note = document.getElementById('rhythm_duration_empty_note');
 
-const duration_buttons = DURATION_TYPES.map(({ code, label }) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = label;
-    button.addEventListener('pointerdown', () => toggle_duration(code));
-    rhythm_duration_selection.appendChild(button);
-    return { code, button };
-});
+// builds one row of pill buttons over DURATION_TYPES, backed by a settings object keyed
+// by duration code (rhythm_settings.durations or .restDurations) -- notes and rests are
+// two independent rows of the same shape, so this is shared between them
+function build_duration_row(container, settingsKey) {
+    return DURATION_TYPES.map(({ code, label }) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.addEventListener('pointerdown', () => toggle_duration(settingsKey, code));
+        container.appendChild(button);
+        return { code, button };
+    });
+}
 
-function toggle_duration(code) {
-    const entry = duration_buttons.find((d) => d.code === code);
-    if (entry.button.disabled) return; // the last of quarter/eighth/sixteenth -- see below
-    rhythm_settings.durations[code] = !rhythm_settings.durations[code];
+const duration_buttons = build_duration_row(rhythm_duration_selection, 'durations');
+const rest_buttons = build_duration_row(rhythm_rest_selection, 'restDurations');
+
+const tie_button = document.createElement('button');
+tie_button.type = 'button';
+tie_button.textContent = 'Ties';
+tie_button.addEventListener('pointerdown', () => {
+    rhythm_settings.ties = !rhythm_settings.ties;
+    tie_button.classList.toggle('active', rhythm_settings.ties);
+    next_rhythm();
+});
+rhythm_tie_selection.appendChild(tie_button);
+
+function toggle_duration(settingsKey, code) {
+    const buttons = settingsKey === 'durations' ? duration_buttons : rest_buttons;
+    const entry = buttons.find((d) => d.code === code);
+    if (entry.button.disabled) return; // notes: the last of quarter/eighth/sixteenth -- see below
+    rhythm_settings[settingsKey][code] = !rhythm_settings[settingsKey][code];
     sync_duration_buttons();
     next_rhythm();
 }
 
-// keeps every button's pressed look in sync with the setting, and locks whichever of
-// quarter/eighth/sixteenth is the last one left on -- fill_beat() always has one of those
-// three as its unsplittable base case (see fillable()), so letting all three go dark would
-// leave a full beat with no legal way to fill it at all.
+// keeps every button's pressed look in sync with its setting, and -- for note types only --
+// locks whichever of quarter/eighth/sixteenth is the last one left on. fill_beat() always
+// has one of those three as its unsplittable base case (see fillable()), so letting all
+// three go dark would leave a full beat with no legal way to fill it at all. Rests have no
+// such floor: turning every rest off just means every generated slot sounds, which is fine.
 function sync_duration_buttons() {
     const essentialOn = ESSENTIAL_DURATIONS.filter((code) => rhythm_settings.durations[code]);
     duration_buttons.forEach(({ code, button }) => {
@@ -1286,12 +1305,16 @@ function sync_duration_buttons() {
             ? 'at least one of quarter, eighth or sixteenth has to stay on, or a beat could never be filled'
             : '';
     });
+    rest_buttons.forEach(({ code, button }) => {
+        button.classList.toggle('active', rhythm_settings.restDurations[code]);
+    });
+    tie_button.classList.toggle('active', rhythm_settings.ties);
 }
 sync_duration_buttons();
 
 // note types, rests and ties only shape generated rhythms, and melody practice can only
-// come from a real passage -- grey out (or, for the note-types panel, swap for an
-// explanatory note) whichever don't apply rather than letting them look effective
+// come from a real passage -- swap the panel's content for an explanatory note whenever
+// none of it applies, rather than letting it look effective
 function sync_generator_controls() {
     const generated = rhythm_settings.source === 'generated';
     const set_enabled = (id, enabled) => {
@@ -1299,13 +1322,13 @@ function sync_generator_controls() {
         input.disabled = !enabled;
         input.closest('label').classList.toggle('disabled', !enabled);
     };
-    set_enabled('rhythm_rests', generated && !melodic());
-    set_enabled('rhythm_ties', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
     set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
 
     const durationsApply = generated && !melodic();
-    rhythm_duration_selection.style.display = durationsApply ? 'flex' : 'none';
+    [rhythm_duration_selection, rhythm_rest_selection, rhythm_tie_selection].forEach((el) => {
+        el.style.display = durationsApply ? 'flex' : 'none';
+    });
     rhythm_duration_empty_note.style.display = durationsApply ? 'none' : 'block';
 
     // ...and while partimento is up the control is pinned to Both, not merely greyed:

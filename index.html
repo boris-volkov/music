@@ -135,8 +135,16 @@
             <div class="choice_holder">
                 <div class="selection_title">note types</div>
                 <div id = "rhythm_duration_selection" class="selection"></div>
-                <div id = "rhythm_duration_empty_note">Only shapes Generated rhythms -- set Rhythms to Generated above to use this.</div>
             </div>
+            <div class="choice_holder">
+                <div class="selection_title">rests</div>
+                <div id = "rhythm_rest_selection" class="selection"></div>
+            </div>
+            <div class="choice_holder">
+                <div class="selection_title">ties</div>
+                <div id = "rhythm_tie_selection" class="selection"></div>
+            </div>
+            <div id = "rhythm_duration_empty_note">Only shapes Generated rhythms -- set Rhythms to Generated above to use this.</div>
         </div>
 
         <div id = "app_grid">
@@ -196,14 +204,6 @@
                                 <option value="12">12</option>
                                 <option value="16">16</option>
                             </select>
-                        </label>
-                        <label class="checkbox_label">
-                            <input type="checkbox" id = "rhythm_rests" checked>
-                            <span class="control_label">Rests</span>
-                        </label>
-                        <label class="checkbox_label">
-                            <input type="checkbox" id = "rhythm_ties" checked>
-                            <span class="control_label">Ties</span>
                         </label>
                         <label>
                             <span class="control_label">Hands</span>
