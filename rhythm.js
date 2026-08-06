@@ -37,6 +37,7 @@ const rhythm_settings = {
     hands: 'right',      // 'right' | 'left' | 'both' -- 'both' adds the lower voice
     vocabulary: 'eighths',
     rests: true,
+    ties: true,          // let an off-the-beat note tie across the beat instead of stopping at it
     metronome: true,
 };
 
@@ -119,19 +120,96 @@ function beat_duration() {
 
 // --- generation ---------------------------------------------------------------
 
+// Standard rhythmic notation keeps the beat visible at a glance: a note shorter than a
+// beat must not straddle a beat boundary (an eighth note starting on the "and" of beat 1
+// has to end by beat 2, not run past it), and a note longer than a beat must start
+// exactly on one. Picking any duration that merely fits the beats left in the bar --
+// which is what this used to do -- happily violates both: it can just as easily open a
+// quarter note on an off-beat eighth as on the beat itself, which is how you get a
+// quarter that eats the boundary between beats 2 and 3 with nothing to mark where beat 3
+// actually falls. Real syncopation crosses the beat too, but on purpose and visibly --
+// via a tie, so the boundary is still marked even though nothing attacks there; see
+// add_ties() below for that half of the picture. See Gould, "Behind Bars", or Read,
+// "Music Notation", on beaming and rest values reflecting the beat -- this is standard
+// engraving practice, not a house style.
+//
+// So generation is built beat-by-beat instead of across the whole bar: a note bigger than
+// a beat is only ever opened while standing on a beat boundary, and everything else fills
+// exactly one beat by recursively halving it (q -> 8+8 -> 16+16+16+16, or any mix the
+// vocabulary allows). Every halving lands back on beat- or half-beat-aligned ground, so
+// nothing produced this way can ever obscure a beat.
+const CELL_DURATION = { 1: 'q', 0.5: '8', 0.25: '16' }; // duration code for one beat or less
+const KEEP_WHOLE_CHANCE = 0.55; // vs. splitting a beat cell in two, when both are legal
+const SPAN_BEATS_CHANCE = 0.35; // vs. filling one beat at a time, when a bigger note fits
+const REST_CHANCE = 0.18;
+
+function push_note(measure, duration) {
+    // never open on a rest -- there'd be nothing to anchor the first beat against
+    const rest = rhythm_settings.rests && measure.length > 0 && Math.random() < REST_CHANCE;
+    measure.push({ duration, rest });
+}
+
+// fills exactly one beat-or-smaller cell: leaves it whole when the vocabulary has that
+// value, or splits it into two equal halves and recurses -- so a beat only ever comes
+// out as one of the standard subdivisions (q, or 8+8, or 8+16+16, or 16x4, ...)
+function fill_beat(measure, pool, cellBeats) {
+    const whole = CELL_DURATION[cellBeats];
+    const half = cellBeats / 2;
+    const canKeep = pool.includes(whole);
+    const canSplit = pool.includes(CELL_DURATION[half]);
+
+    if (canSplit && (!canKeep || Math.random() > KEEP_WHOLE_CHANCE)) {
+        fill_beat(measure, pool, half);
+        fill_beat(measure, pool, half);
+    } else {
+        push_note(measure, whole);
+    }
+}
+
+const SYNCOPATION_CHANCE = 0.35; // vs. leaving the beat boundary as a fresh attack, when a tie is eligible
+
+// A tie is the sanctioned way to cross a beat: fill_beat() and the spanning-note branch
+// above never let a single note straddle a boundary, but a note that already starts off
+// the beat can be tied forward into whatever begins the next one, so the sound still
+// carries through without a new attack pretending the boundary isn't there. Eligibility
+// mirrors that reasoning -- only a note that itself began off the beat may open a tie
+// (tying a note that already started on the beat would just spell a plain note or a rest
+// some other way, not notate syncopation), and only at a boundary it lands on exactly.
+function add_ties(measure) {
+    if (!rhythm_settings.ties) return;
+    let beat = 0;
+    for (let i = 0; i < measure.length - 1; i++) {
+        const note = measure[i];
+        const end = beat + DURATION_BEATS[note.duration];
+        const startedOffBeat = Math.abs(beat - Math.round(beat)) > 1e-9;
+        const endsOnBeat = Math.abs(end - Math.round(end)) < 1e-9;
+        const next = measure[i + 1];
+        if (startedOffBeat && endsOnBeat && !note.rest && !next.rest && Math.random() < SYNCOPATION_CHANCE) {
+            note.tie = true;
+        }
+        beat = end;
+    }
+}
+
 function generate_measure() {
     const pool = VOCABULARY[rhythm_settings.vocabulary];
+    const spanning = Object.keys(DURATION_BEATS).filter((d) => DURATION_BEATS[d] > 1 && pool.includes(d));
     const measure = [];
-    let remaining = BEATS_PER_MEASURE;
+    let beat = 0;
 
-    while (remaining > 1e-9) {
-        const fits = pool.filter((d) => DURATION_BEATS[d] <= remaining + 1e-9);
-        const duration = random_element(fits);
-        // never open on a rest -- there'd be nothing to anchor the first beat against
-        const rest = rhythm_settings.rests && measure.length > 0 && Math.random() < 0.18;
-        measure.push({ duration, rest });
-        remaining -= DURATION_BEATS[duration];
+    while (beat < BEATS_PER_MEASURE - 1e-9) {
+        const remaining = BEATS_PER_MEASURE - beat;
+        const fits = spanning.filter((d) => DURATION_BEATS[d] <= remaining + 1e-9);
+        if (fits.length && Math.random() < SPAN_BEATS_CHANCE) {
+            const duration = random_element(fits);
+            push_note(measure, duration);
+            beat += DURATION_BEATS[duration];
+        } else {
+            fill_beat(measure, pool, 1);
+            beat += 1;
+        }
     }
+    add_ties(measure);
     return measure;
 }
 
@@ -141,15 +219,20 @@ function generate_measure() {
 function finish_rhythm(measures, attribution = null, key = null, bass = null) {
     // walk a voice, stamping each note with its absolute beat and collecting what the
     // player has to hit. with two hands both voices contribute to the same target list.
+    // a note carried in on a tie is the same attack as the one before it -- nothing to
+    // tap a second time -- so it's stamped with its beat like any other note (the score
+    // still needs it, and its own duration still advances the clock) but never targeted.
     const targets = [];
     const walk = (voice) => {
         let beat = 0;
+        let tiedFromPrev = false;
         voice.forEach((measure) => {
             measure.forEach((note) => {
                 note.startBeat = beat;
-                if (!note.rest) {
+                if (!note.rest && !tiedFromPrev) {
                     targets.push({ beat, midi: note.pitch ? pitch_to_midi(note.pitch) : null });
                 }
+                tiedFromPrev = !!note.tie;
                 beat += DURATION_BEATS[note.duration];
             });
         });
@@ -175,9 +258,36 @@ function finish_rhythm(measures, attribution = null, key = null, bass = null) {
     };
 }
 
+// A barline is still just a beat boundary underneath -- beat 0 of measure m+1 is the same
+// instant as beat 4 of measure m -- so the same case for a tie applies there too: a note
+// that already started off the beat can be tied across the barline into the next measure,
+// same as it could across any other beat. The one place this can't be offered is where
+// MEASURES_PER_LINE wraps to a new system: the two notes then sit on different lines of
+// the score, and a tie is a single curve between two notes on the same line -- there's no
+// sane way to draw one that arcs off the right edge of one system and back in on the left
+// edge of the next, so that particular boundary is left alone.
+function add_cross_measure_ties(measures) {
+    if (!rhythm_settings.ties) return;
+    for (let m = 0; m < measures.length - 1; m++) {
+        if ((m + 1) % MEASURES_PER_LINE === 0) continue; // system break -- can't draw this one
+        const measure = measures[m];
+        const last = measure[measure.length - 1];
+        const next = measures[m + 1][0];
+
+        let lastStart = 0;
+        for (let i = 0; i < measure.length - 1; i++) lastStart += DURATION_BEATS[measure[i].duration];
+        const startedOffBeat = Math.abs(lastStart - Math.round(lastStart)) > 1e-9;
+
+        if (startedOffBeat && !last.rest && !next.rest && Math.random() < SYNCOPATION_CHANCE) {
+            last.tie = true;
+        }
+    }
+}
+
 function generate_rhythm() {
     const measures = [];
     for (let m = 0; m < rhythm_settings.measures; m++) measures.push(generate_measure());
+    add_cross_measure_ties(measures);
     return finish_rhythm(measures);
 }
 
@@ -185,13 +295,16 @@ function generate_rhythm() {
 
 const PITCH_CLASS = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
 
-// corpus notes are 'duration:pitch' ('q:f#4') or a bare rest ('8r')
+// corpus notes are 'duration:pitch' ('q:f#4') or a bare rest ('8r'), either optionally
+// carrying a trailing '~' -- a tie forward into whichever note follows it
 function parse_note(token) {
+    const tie = token.endsWith('~');
+    if (tie) token = token.slice(0, -1);
     if (token.endsWith('r')) {
         return { duration: token.slice(0, -1), rest: true };
     }
     const [duration, pitch] = token.split(':');
-    return { duration, rest: false, pitch };
+    return { duration, rest: false, pitch, tie };
 }
 
 // 'f#4' -> 'f#/4', the key format VexFlow wants
@@ -205,6 +318,25 @@ function pitch_to_midi(pitch) {
     let semitones = PITCH_CLASS[body[0]];
     for (const ch of body.slice(1)) semitones += ch === '#' ? 1 : -1;
     return (octave + 1) * 12 + semitones;
+}
+
+// A tie the corpus kept is a fact about the real piece, not something under this
+// excerpt's control the way a generated tie is -- generate_rhythm() simply never opens
+// one at a spot it can't draw, but bach_excerpt() below slices a *random* window out of
+// a longer run, so the same kept tie can land on the last measure of a rendered system
+// in one round and land safely mid-system in the next, purely by luck of the offset. Strip
+// it wherever this particular slice puts it somewhere layout_system() has no next note to
+// reach for: the last measure of a system (a tie can't arc from one system to the next --
+// see add_cross_measure_ties() in the generator for the same restriction), or the last
+// measure of the slice itself (there's no next measure in this excerpt at all).
+function guard_unsafe_ties(measures) {
+    measures.forEach((measure, i) => {
+        const last = measure[measure.length - 1];
+        if (!last || !last.tie) return;
+        const systemBreak = (i + 1) % MEASURES_PER_LINE === 0;
+        const lastOfSlice = i === measures.length - 1;
+        if (systemBreak || lastOfSlice) last.tie = false;
+    });
 }
 
 // takes a contiguous window out of one real passage, rather than stitching together
@@ -223,6 +355,8 @@ function bach_excerpt() {
     // left hand alone practises the bass on its own, so it becomes the primary voice
     const measures = left_only() ? read(excerpt.b) : read(excerpt.s);
     const bass = two_handed() ? read(excerpt.b) : null;
+    guard_unsafe_ties(measures);
+    if (bass) guard_unsafe_ties(bass);
 
     const [catalogue, title, key] = BACH_PIECES[excerpt.p];
     const first = offset + 1;
@@ -276,6 +410,23 @@ function build_stave_notes(measure, clef) {
     });
 }
 
+// the curved tie marks for whichever notes in this measure add_ties() tagged -- built
+// from the same measure array build_stave_notes() just turned into VF.StaveNote objects,
+// so the indices still line up one-to-one between the two. the measure's own last note
+// is skipped here even when tagged -- that tie's other end is the next measure's first
+// note, which add_cross_measure_ties() may have reached across the barline for, and
+// layout_system() wires up once it has both measures' notes in hand.
+function build_stave_ties(measure, notes) {
+    const VF = Vex.Flow;
+    const ties = [];
+    measure.forEach((note, i) => {
+        if (note.tie && i + 1 < notes.length) {
+            ties.push(new VF.StaveTie({ first_note: notes[i], last_note: notes[i + 1] }));
+        }
+    });
+    return ties;
+}
+
 // Lays out and draws one line (system) of the score into `context` at `topY`, and
 // reports how far this line's own notes reach beyond their staff: above the top stave's
 // top line, below the bottom stave's bottom line, and -- on a grand staff -- into the
@@ -308,6 +459,14 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
     let upperTop = Infinity, upperBottom = -Infinity;
     let lowerTop = Infinity, lowerBottom = -Infinity;
     let upperTopLineY = null, upperBottomLineY = null, lowerTopLineY = null, bottomLineY = null;
+
+    // a note pending a tie into the next measure's first note, carried from one column to
+    // the next within this same system. It never needs to survive past the last column --
+    // add_cross_measure_ties() already refuses to tag a tie at a system break -- so there's
+    // nothing to hand back to render_rhythm_score() between one layout_system() call and
+    // the next; each system starts and ends this local to itself.
+    let carryUpperTie = null;
+    let carryLowerTie = null;
 
     let x = leftMargin;
     for (let column = 0; column < count; column++) {
@@ -370,6 +529,13 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
 
         const beams = VF.Beam.generateBeams(upperNotes)
             .concat(lowerNotes ? VF.Beam.generateBeams(lowerNotes) : []);
+        const ties = build_stave_ties(current_rhythm.measures[mi], upperNotes)
+            .concat(lowerNotes ? build_stave_ties(current_rhythm.bass[mi], lowerNotes) : []);
+        // stitch in whatever the previous column left pending -- its last note is already
+        // fully formatted (that happened on its own turn through this loop), and this
+        // column's first note is about to be, so by draw time both ends are in place
+        if (carryUpperTie) ties.push(new VF.StaveTie({ first_note: carryUpperTie, last_note: upperNotes[0] }));
+        if (carryLowerTie) ties.push(new VF.StaveTie({ first_note: carryLowerTie, last_note: lowerNotes[0] }));
 
         // formatting both voices together is what keeps the hands aligned in time
         const formatter = new VF.Formatter();
@@ -379,6 +545,15 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
         upperVoice.setContext(context).setStave(stave).draw();
         if (lowerVoice) lowerVoice.setContext(context).setStave(bassStave).draw();
         beams.forEach((beam) => beam.setContext(context).draw());
+        ties.forEach((tie) => tie.setContext(context).draw());
+
+        const upperMeasure = current_rhythm.measures[mi];
+        carryUpperTie = upperMeasure[upperMeasure.length - 1].tie ? upperNotes[upperNotes.length - 1] : null;
+        carryLowerTie = null;
+        if (lowerNotes) {
+            const lowerMeasure = current_rhythm.bass[mi];
+            carryLowerTie = lowerMeasure[lowerMeasure.length - 1].tie ? lowerNotes[lowerNotes.length - 1] : null;
+        }
 
         if (bassStave) { // brace the system, and join the barlines between staves
             const connector = column === 0 ? VF.StaveConnector.type.BRACE : null;
@@ -962,9 +1137,14 @@ document.getElementById('rhythm_rests').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-// note vocabulary and rests only shape generated rhythms, and melody practice can only
-// come from a real passage -- grey out whichever don't apply rather than letting them
-// look effective
+document.getElementById('rhythm_ties').addEventListener('change', (e) => {
+    rhythm_settings.ties = e.target.checked;
+    next_rhythm();
+});
+
+// note vocabulary, rests and ties only shape generated rhythms, and melody practice can
+// only come from a real passage -- grey out whichever don't apply rather than letting
+// them look effective
 function sync_generator_controls() {
     const generated = rhythm_settings.source === 'generated';
     const set_enabled = (id, enabled) => {
@@ -974,6 +1154,7 @@ function sync_generator_controls() {
     };
     set_enabled('rhythm_vocabulary', generated && !melodic());
     set_enabled('rhythm_rests', generated && !melodic());
+    set_enabled('rhythm_ties', generated && !melodic());
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
     set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
 
