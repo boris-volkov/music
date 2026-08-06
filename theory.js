@@ -196,8 +196,12 @@ class Structure_Collection {
   constructor(name, list) {
     this.name = name;
     this.list = list.map((struct) => {
-      const [name, notes] = struct;
-      const structure = new Structure(name, notes);
+      // active is optional and defaults to Structure's own default (true) when omitted --
+      // most callers (intervals, partimento) don't set it and keep every choice on. Scales
+      // and chords opt into an explicit per-entry default via only_active() below instead,
+      // so a beginner isn't shown two dozen pre-selected exotic scales on their first visit.
+      const [name, notes, active] = struct;
+      const structure = new Structure(name, notes, active);
       structure.setButton(this.createButton(structure));
       return structure;
     });
@@ -251,6 +255,13 @@ class Structure_Collection {
   }
 }
 
+// stamps every entry with an explicit active flag -- true for the ones in `defaultNames`,
+// false for everything else -- so a long list (scales, chords) opens with just a handful
+// of the most basic choices on, rather than the whole catalogue selected at once
+function only_active(list, defaultNames) {
+  return list.map(([name, notes]) => [name, notes, defaultNames.includes(name)]);
+}
+
 const intervals = new Structure_Collection('interval_types', [
   ['min 2nd above', [0, 1]],
   ['min 2nd below', [0, -1]],
@@ -277,7 +288,7 @@ const intervals = new Structure_Collection('interval_types', [
 ]);
 
 
-  const scales = new Structure_Collection('scale_types', [
+  const scales = new Structure_Collection('scale_types', only_active([
     // Standard scales
     ['major', [0, 2, 4, 5, 7, 9, 11]],
     ['natural minor', [0, 2, 3, 5, 7, 8, 10]],
@@ -312,10 +323,10 @@ const intervals = new Structure_Collection('interval_types', [
     ['persian dominant', [0, 1, 4, 5, 6, 8, 11]], // Persian Dominant Scale
     ['neapolitan major', [0, 1, 3, 5, 7, 9, 11]], // Neapolitan Major Scale
     ['neapolitan minor', [0, 1, 3, 5, 7, 8, 11]], // Neapolitan Minor Scale
-  ]);
-  
+  ], ['major', 'natural minor']));
 
-  const chords = new Structure_Collection('chord_types', [
+
+  const chords = new Structure_Collection('chord_types', only_active([
     ['5', [0, 7]],
     ['m', [0, 3, 7]],
     ['Maj', [0, 4, 7]],
@@ -344,4 +355,4 @@ const intervals = new Structure_Collection('interval_types', [
     ['Maj13', [0, 4, 7, 11, 14, 17, 21]], // Major 7th chord with added 9th, 11th, and 13th
     ['m13', [0, 3, 7, 10, 14, 17, 21]], // Minor 7th chord with added 9th, 11th, and 13th
     ['aug7', [0, 4, 8, 10]], // Augmented 7th chord
-  ]);
+  ], ['Maj', 'm']));
