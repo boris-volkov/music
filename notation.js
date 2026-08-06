@@ -38,7 +38,8 @@ function note_to_vexkey(note, octave = 4) {
 // context.scale(), applied to a renderer sized to match, so nothing gets clipped.
 const BIG_STAFF_SCALE = 2.5;
 const STAVE_WIDTH = 220;   // unscaled -- room for a clef and one note
-const LEGEND_GAP = 34;     // unscaled -- clearance between the stave's right edge and the legend
+const LEGEND_GAP = 40;     // unscaled -- clearance between the stave's right edge and the legend,
+                           // wide enough for the staggered column below to fit inside it
 const STAVE_MARGIN = 10;   // unscaled -- clearance on every other side
 
 // the letter each staff line names, top line (index 0) to bottom line (index 4) -- matches
@@ -51,14 +52,23 @@ const STAVE_LINE_LETTERS = {
     bass: ['A', 'F', 'D', 'B', 'G'],
 };
 
+// Adjacent lines are only 10 (unscaled) units apart -- 25px once BIG_STAFF_SCALE is applied
+// -- so a font sized to actually read well from across a room comes out taller than that
+// gap and neighboring letters run into each other. Two fixes together: a smaller font (still
+// legible once scaled up), and staggering every other letter further out so immediate
+// neighbors aren't fighting for the same column at all.
+const LEGEND_FONT_SIZE = 9; // unscaled -- 22.5px on screen, just under the 25px line gap
+const LEGEND_STAGGER = 15;  // unscaled -- extra x for every other letter (odd line index)
+
 function draw_stave_legend(context, stave, clef) {
     const letters = STAVE_LINE_LETTERS[clef];
     if (!letters) return;
-    const x = stave.getX() + stave.getWidth() + 10;
+    const x = stave.getX() + stave.getWidth() + 8;
     context.save();
-    context.setFont('Arial', 14, 'bold');
+    context.setFont('Arial', LEGEND_FONT_SIZE, 'bold');
     letters.forEach((letter, i) => {
-        context.fillText(letter, x, stave.getYForLine(i) + 5); // +5: nudge onto the line itself
+        const staggerX = i % 2 === 1 ? LEGEND_STAGGER : 0;
+        context.fillText(letter, x + staggerX, stave.getYForLine(i) + 3); // +3: onto the line itself
     });
     context.restore();
 }
