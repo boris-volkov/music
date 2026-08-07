@@ -52,11 +52,15 @@ function partimento_mode() {
     return rhythm_settings.source === 'partimento';
 }
 
+function scales_mode() {
+    return rhythm_settings.source === 'scales';
+}
+
 // melodies only exist in the borrowed corpus, so melody mode implies a real passage. A
 // partimento pattern needs no such switch -- there is nothing in one to practise but the
-// notes, so it is always pitched.
+// notes, so it is always pitched. Scale practice is the same story as partimento.
 function melodic() {
-    return partimento_mode() || (rhythm_settings.melody && rhythm_settings.source === 'bach');
+    return partimento_mode() || scales_mode() || (rhythm_settings.melody && rhythm_settings.source === 'bach');
 }
 
 // the lower line is only worth showing when its pitches are being asked for. A partimento
@@ -1179,6 +1183,17 @@ function next_rhythm() {
         passage = partimento_passage();
         if (!passage) return; // it has already said which pool was left empty
     }
+    else if (scales_mode()) {
+        // same defensive story as partimento above -- a stale/missing scale_practice.js
+        // would otherwise fall through to the generator and look like scales did nothing
+        if (typeof scale_practice_passage !== 'function') {
+            rhythm_feedback.textContent = 'scale practice failed to load — reload the page';
+            rhythm_feedback.className = 'failed';
+            return;
+        }
+        passage = scale_practice_passage();
+        if (!passage) return; // it has already said which pool was left empty
+    }
     else if (rhythm_settings.source === 'bach') passage = bach_excerpt();
 
     let note = '';
@@ -1232,9 +1247,9 @@ function init_rhythm_panel(sections = []) {
 
 function init_rhythm() {
     rhythm_settings.melody = false; // this topic is timing only, whatever the source
-    // a partimento pattern is nothing but pitches, so it can't be left as the source of a
-    // timing-only round -- fall back to the generator
-    if (partimento_mode()) rhythm_settings.source = 'generated';
+    // a partimento pattern or a scale is nothing but pitches, so neither can be left as
+    // the source of a timing-only round -- fall back to the generator
+    if (partimento_mode() || scales_mode()) rhythm_settings.source = 'generated';
     document.getElementById('rhythm_source').value = rhythm_settings.source;
     sync_generator_controls();
     init_rhythm_panel();
@@ -1352,21 +1367,28 @@ function sync_generator_controls() {
         input.disabled = !enabled;
         input.closest('label').classList.toggle('disabled', !enabled);
     };
-    // melody is always Bach, partimento is always partimento -- both topics pin this
-    // rather than leave it a live choice, the same way Hands gets pinned below. Without
-    // this, picking a different source out from under partimento (or vice versa, since
-    // the dropdown's own "Partimento patterns" option is otherwise still reachable) would
-    // silently morph the game into a different one mid-round instead of switching topics
-    // properly through the buttons that actually set one up.
-    set_enabled('rhythm_source', !rhythm_settings.melody && !partimento_mode());
+    // melody is always Bach, partimento is always partimento, scales is always scales --
+    // all three topics pin this rather than leave it a live choice, the same way Hands
+    // gets pinned below. Without this, picking a different source out from under one of
+    // them (or vice versa, since the dropdown's own "Partimento patterns"/"Scale
+    // practice" options are otherwise still reachable) would silently morph the game into
+    // a different one mid-round instead of switching topics properly through the buttons
+    // that actually set one up.
+    set_enabled('rhythm_source', !rhythm_settings.melody && !partimento_mode() && !scales_mode());
     set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
 
     // ...and while partimento is up the control is pinned to Both, not merely greyed:
     // a disabled select still reading "Left" would be describing an exercise that is
     // being played with two hands. The stored preference is left alone underneath, so
-    // melody practice gets its own choice back on the way out.
+    // melody and scale practice get their own choice back on the way out.
     const hands = document.getElementById('rhythm_hands');
     hands.value = partimento_mode() ? 'both' : rhythm_settings.hands;
+
+    // Measures doesn't mean anything for scale practice -- the octave count drives how
+    // long the passage is instead -- so the two controls swap places rather than sit
+    // side by side with one of them inert.
+    document.getElementById('rhythm_measures_label').style.display = scales_mode() ? 'none' : 'flex';
+    document.getElementById('scale_octaves_label').style.display = scales_mode() ? 'flex' : 'none';
 }
 sync_generator_controls();
 

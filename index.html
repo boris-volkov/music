@@ -204,9 +204,12 @@
                                      can still show "Partimento patterns" as its (locked) value
                                      while that topic is active -- see sync_generator_controls(). -->
                                 <option value="partimento" disabled>Partimento patterns</option>
+                                <!-- same story as Partimento patterns above -- only the Modes
+                                     topic button puts you into scale practice -->
+                                <option value="scales" disabled>Scale practice</option>
                             </select>
                         </label>
-                        <label>
+                        <label id = "rhythm_measures_label">
                             <span class="control_label">Measures</span>
                             <select id = "rhythm_measures">
                                 <option value="2">2</option>
@@ -214,6 +217,14 @@
                                 <option value="8">8</option>
                                 <option value="12">12</option>
                                 <option value="16">16</option>
+                            </select>
+                        </label>
+                        <label id = "scale_octaves_label" style="display: none">
+                            <span class="control_label">Octaves</span>
+                            <select id = "scale_octaves">
+                                <option value="1" selected>1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
                             </select>
                         </label>
                         <label>
@@ -276,11 +287,11 @@
     <script src = "note_quiz.js"    ></script>
     <script src = "interval_quiz.js"></script>
     <script src = "chord_quiz.js"   ></script>
-    <script src = "scale_quiz.js"   ></script>
     <script src = "scale_degrees.js"></script>
     <script src = "bach_corpus.js"  ></script>
     <script src = "rhythm.js"       ></script>
     <script src = "partimento.js"   ></script>
+    <script src = "scale_practice.js"></script>
     <script src = "buttons.js"      ></script>
     <script src = "interval_ear_training.js"></script>
 
