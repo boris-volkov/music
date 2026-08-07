@@ -1352,7 +1352,13 @@ function sync_generator_controls() {
         input.disabled = !enabled;
         input.closest('label').classList.toggle('disabled', !enabled);
     };
-    set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
+    // melody is always Bach, partimento is always partimento -- both topics pin this
+    // rather than leave it a live choice, the same way Hands gets pinned below. Without
+    // this, picking a different source out from under partimento (or vice versa, since
+    // the dropdown's own "Partimento patterns" option is otherwise still reachable) would
+    // silently morph the game into a different one mid-round instead of switching topics
+    // properly through the buttons that actually set one up.
+    set_enabled('rhythm_source', !rhythm_settings.melody && !partimento_mode());
     set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
 
     // ...and while partimento is up the control is pinned to Both, not merely greyed:

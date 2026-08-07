@@ -197,7 +197,13 @@
                             <select id = "rhythm_source">
                                 <option value="generated" selected>Generated</option>
                                 <option value="bach">Bach chorales</option>
-                                <option value="partimento">Partimento patterns</option>
+                                <!-- never a real choice here -- only the Patterns topic button
+                                     puts you into partimento mode, since that also has to set up
+                                     the pattern picker and pin Hands, neither of which picking
+                                     this from the dropdown would do. Present only so this select
+                                     can still show "Partimento patterns" as its (locked) value
+                                     while that topic is active -- see sync_generator_controls(). -->
+                                <option value="partimento" disabled>Partimento patterns</option>
                             </select>
                         </label>
                         <label>
