@@ -11,28 +11,39 @@
 const SHARP_SPELLING = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
 const FLAT_SPELLING = ['c', 'db', 'd', 'eb', 'e', 'f', 'gb', 'g', 'ab', 'a', 'bb', 'b'];
 
-// Not a full context-aware respelling -- a 5-note pentatonic scale, say, doesn't map onto
-// "one degree, one letter" the way a 7-note diatonic scale does, and several of the
-// scales on offer (whole tone, diminished, blues) don't have one settled textbook
-// spelling to defer to in the first place. This just spells every degree consistently,
-// sharps or flats depending on which the chosen root itself uses -- readable and
-// pitch-correct, if not always the exact spelling a publisher would choose.
-function spell_scale_pitch(tonicPitchClass, baseOctave, semitoneOffset, preferFlats) {
-    const absolute = tonicPitchClass + baseOctave * 12 + semitoneOffset;
+// Picks whichever spelling scheme actually fits this scale. Scales with exactly 7 notes
+// per octave -- most of the list; see the scales array in theory.js -- get proper
+// letter-by-degree spelling (spell_scale_degree(), shared with partimento.js): correct by
+// construction, double sharps/flats included when the key genuinely needs one -- C minor's
+// third degree comes out an E♭ because it's a letter-and-two-thirds up from C, not because
+// a table happened to have a flat in slot 3. A scale with some other note count (pentatonic,
+// blues, whole tone, diminished, bebop dominant, the Japanese five-note scales) doesn't map
+// onto "one degree, one letter" -- a 5-note scale would have to skip letters inconsistently
+// -- and several of them don't have one settled textbook spelling to defer to regardless,
+// so those fall back to a simpler, still pitch-correct but not always textbook-exact
+// spelling instead: sharps or flats consistently, whichever the chosen root itself favours.
+// `octaveShift` is relative to the tonic's own octave, same convention spell_scale_degree()
+// uses -- the caller works out what that needs to be to land on a specific absolute octave.
+function spell_scale_pitch(tonic, root, steps, degree, octaveShift, preferFlats) {
+    if (steps.length === 7) {
+        return spell_scale_degree(tonic, degree, steps, octaveShift);
+    }
+    const semitoneOffset = steps[degree.mod(steps.length)] + 12 * Math.floor(degree / steps.length);
+    const absolute = root.number + (tonic.octave + octaveShift) * 12 + semitoneOffset;
     const pitchClass = ((absolute % 12) + 12) % 12;
     const octave = Math.floor(absolute / 12);
     const letter = (preferFlats ? FLAT_SPELLING : SHARP_SPELLING)[pitchClass];
     return letter + octave;
 }
 
-// the up-then-down semitone-offset sequence for `octaves` octaves of a scale whose
-// degrees sit `steps` semitones above the tonic (major's steps are [0,2,4,5,7,9,11]).
-// Ascends through each octave, touches the tonic one octave above the start, then
-// mirrors back down to -- but not repeating -- the starting tonic.
-function scale_offsets(steps, octaves) {
+// the up-then-down DEGREE sequence for `octaves` octaves of an n-note scale: 0, 1, ...,
+// n-1, n, n+1, ..., up to the top tonic (n*octaves, where the scale turns around), then
+// back down to -- but not repeating -- the starting tonic. Degrees, not semitone offsets
+// -- spell_scale_pitch() is what turns one into an actual pitch.
+function scale_degrees(noteCount, octaves) {
+    const top = noteCount * octaves;
     const ascending = [];
-    for (let o = 0; o < octaves; o++) steps.forEach((s) => ascending.push(o * 12 + s));
-    ascending.push(octaves * 12); // the top tonic, where the scale turns around
+    for (let d = 0; d <= top; d++) ascending.push(d);
     const descending = ascending.slice(0, -1).reverse();
     return [...ascending, ...descending];
 }
@@ -53,8 +64,16 @@ function scale_practice_passage() {
         return null;
     }
 
+    const tonic = tonic_from_note_name(root.name);
     const preferFlats = root.name.includes('♭');
-    const offsets = scale_offsets(chosenScale.notes, scale_practice_settings.octaves);
+    const steps = chosenScale.notes;
+    const degrees = scale_degrees(steps.length, scale_practice_settings.octaves);
+    // absolute octaves (right hand around 4, left around 3, a real octave apart) --
+    // spell_scale_degree()'s own convention is a shift relative to the tonic's octave,
+    // which tonic_from_note_name() picks per root rather than always landing on 4, so this
+    // works out whatever shift actually gets there for whichever root got chosen
+    const upperShift = 4 - tonic.octave;
+    const lowerShift = 3 - tonic.octave;
 
     // enough rhythm to cover every degree at least once. Regenerated fresh at each
     // candidate length rather than grown incrementally -- a handful of extra
@@ -73,7 +92,7 @@ function scale_practice_passage() {
             if (!note.rest && !tiedFromPrev) attacks++;
             tiedFromPrev = !!note.tie;
         });
-    } while (attacks < offsets.length);
+    } while (attacks < degrees.length);
 
     // Walks that rhythm and hangs the scale's next degree off every genuine new attack --
     // a rest stays silent, and a note tied in from the one before it repeats that note's
@@ -93,9 +112,9 @@ function scale_practice_passage() {
                 lowerMeasure.push({ duration: note.duration, rest: true });
             } else {
                 if (!tiedFromPrev) {
-                    const offset = offsets[Math.min(step, offsets.length - 1)];
-                    upperPitch = spell_scale_pitch(root.number, 4, offset, preferFlats);
-                    lowerPitch = spell_scale_pitch(root.number, 3, offset, preferFlats);
+                    const degree = degrees[Math.min(step, degrees.length - 1)];
+                    upperPitch = spell_scale_pitch(tonic, root, steps, degree, upperShift, preferFlats);
+                    lowerPitch = spell_scale_pitch(tonic, root, steps, degree, lowerShift, preferFlats);
                     step++;
                 }
                 upperMeasure.push({ duration: note.duration, rest: false, pitch: upperPitch, tie: note.tie });

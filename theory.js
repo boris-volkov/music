@@ -20,6 +20,71 @@ const key_map = {
   11: ['B'],
 }
 
+// --- pitch spelling -------------------------------------------------------------
+// Shared by partimento.js and scale_practice.js: anything that needs to spell a scale
+// degree correctly -- letter first, then whatever accidental (single, or double when the
+// key genuinely needs one) carries that letter from its natural pitch to the target --
+// rather than picking a note out of a fixed sharps-or-flats table regardless of context.
+// The latter is what a "C minor" built purely from semitones and one global sharps/flats
+// guess gets wrong: its third degree is 3 semitones up, and a flat-blind table spells that
+// D♯ instead of the E♭ the key actually calls for.
+
+const LETTERS = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
+const LETTER_SEMITONES = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+const ACCIDENTAL_SEMITONES = { '#': 1, b: -1, '': 0 };
+
+// The practice options offer every enharmonic spelling of a note, but three of them name
+// keys nobody writes -- D♯ major would need nine sharps. Respelled to the enharmonic
+// equivalent that can actually be put on a stave without an unreasonable pile of accidentals.
+const KEY_RESPELLING = { 'D♯': 'E♭', 'G♯': 'A♭', 'A♯': 'B♭' };
+
+function tonic_from_note_name(name) {
+    const spelled = KEY_RESPELLING[name] || name;
+    const tonic = {
+        letter: spelled[0].toLowerCase(),
+        accidental: spelled.includes('♯') ? '#' : spelled.includes('♭') ? 'b' : '',
+        display: spelled,
+    };
+    tonic.octave = tonic_octave(tonic);
+    return tonic;
+}
+
+// Every key starts from whichever octave puts its tonic nearest middle C, rather than all
+// of them counting up from the same written octave -- that would leave B major sitting
+// almost an octave above C major, and only one of the two anywhere near comfortable.
+function tonic_octave(tonic) {
+    const semitones = LETTER_SEMITONES[tonic.letter] + ACCIDENTAL_SEMITONES[tonic.accidental];
+    return semitones.mod(12) <= 6 ? 4 : 3; // C through F♯ reach up to middle C's octave
+}
+
+function accidental_string(semitones) {
+    if (semitones > 0) return '#'.repeat(semitones);
+    if (semitones < 0) return 'b'.repeat(-semitones);
+    return '';
+}
+
+// A degree is spelled by letter first -- degree 2 of any key is always the third letter up
+// from the tonic -- and then whatever is left between where that letter naturally sits and
+// where the scale wants the note becomes its accidental, doubled when the key genuinely
+// needs it (a sharp-side harmonic minor's raised 7th, say). Going by letter is what keeps
+// E♭ major's fourth degree an A♭ rather than a G♯, so a key signature (where one applies)
+// covers it and nothing has to guess at an enharmonic spelling. `steps` is the scale's own
+// semitone pattern (major's is [0,2,4,5,7,9,11]) and must have exactly 7 entries -- one per
+// letter -- for this to make sense; a scale with some other note count doesn't map onto
+// "one degree, one letter" and needs a different approach (see scale_practice.js).
+function spell_scale_degree(tonic, degree, steps, octaveShift) {
+    const letterIndex = LETTERS.indexOf(tonic.letter) + degree;
+    const letter = LETTERS[letterIndex.mod(7)];
+    const octave = tonic.octave + octaveShift + Math.floor(letterIndex / 7);
+
+    const natural = LETTER_SEMITONES[letter] + 12 * (octave + 1);
+    const tonicPitch = LETTER_SEMITONES[tonic.letter] + ACCIDENTAL_SEMITONES[tonic.accidental]
+        + 12 * (tonic.octave + octaveShift + 1);
+    const wanted = tonicPitch + steps[degree.mod(7)] + 12 * Math.floor(degree / 7);
+
+    return letter + accidental_string(wanted - natural) + octave;
+}
+
 class Notes {
   constructor(name, list) {
     this.name = name;

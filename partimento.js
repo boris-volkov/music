@@ -15,10 +15,9 @@
 // excerpt does, so the grand staff, playhead, metronome and note-matching all come along
 // for free.
 
-const LETTERS = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
-const LETTER_SEMITONES = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+// partimento is always built on a major scale's own degrees -- see spell_scale_degree()
+// in theory.js for the letter-by-letter spelling this and scale_practice.js share
 const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
-const ACCIDENTAL_SEMITONES = { '#': 1, b: -1, '': 0 };
 
 // --- the patterns -------------------------------------------------------------
 
@@ -71,56 +70,6 @@ const PARTIMENTO_PATTERNS = [
         },
     },
 ];
-
-// --- spelling -----------------------------------------------------------------
-
-// The practice options offer every enharmonic spelling of a note, but three of them name
-// major keys nobody writes -- D♯ major would need nine sharps. Respelled to the key that
-// sounds identical and can actually be put on a stave.
-const KEY_RESPELLING = { 'D♯': 'E♭', 'G♯': 'A♭', 'A♯': 'B♭' };
-
-function tonic_from_note_name(name) {
-    const spelled = KEY_RESPELLING[name] || name;
-    const tonic = {
-        letter: spelled[0].toLowerCase(),
-        accidental: spelled.includes('♯') ? '#' : spelled.includes('♭') ? 'b' : '',
-        display: spelled,
-    };
-    tonic.octave = tonic_octave(tonic);
-    return tonic;
-}
-
-// Every key starts from whichever octave puts its tonic nearest middle C, rather than all
-// of them counting up from the same written octave -- that would leave B major sitting
-// almost an octave above C major, and only one of the two anywhere near comfortable.
-function tonic_octave(tonic) {
-    const semitones = LETTER_SEMITONES[tonic.letter] + ACCIDENTAL_SEMITONES[tonic.accidental];
-    return semitones.mod(12) <= 6 ? 4 : 3; // C through F♯ reach up to middle C's octave
-}
-
-function accidental_string(semitones) {
-    if (semitones > 0) return '#'.repeat(semitones);
-    if (semitones < 0) return 'b'.repeat(-semitones);
-    return '';
-}
-
-// A degree is spelled by letter first -- degree 2 of any key is always the third letter up
-// from the tonic -- and then whatever is left between where that letter naturally sits and
-// where the scale wants the note becomes its accidental. Going by letter is what keeps
-// E♭ major's fourth degree an A♭ rather than a G♯, so the key signature covers it and
-// VexFlow prints no accidental at all.
-function degree_to_pitch(tonic, degree, octaveShift) {
-    const letterIndex = LETTERS.indexOf(tonic.letter) + degree;
-    const letter = LETTERS[letterIndex.mod(7)];
-    const octave = tonic.octave + octaveShift + Math.floor(letterIndex / 7);
-
-    const natural = LETTER_SEMITONES[letter] + 12 * (octave + 1);
-    const tonicPitch = LETTER_SEMITONES[tonic.letter] + ACCIDENTAL_SEMITONES[tonic.accidental]
-        + 12 * (tonic.octave + octaveShift + 1);
-    const wanted = tonicPitch + MAJOR_STEPS[degree.mod(7)] + 12 * Math.floor(degree / 7);
-
-    return letter + accidental_string(wanted - natural) + octave;
-}
 
 // --- building a passage -------------------------------------------------------
 
@@ -185,8 +134,8 @@ function partimento_passage() {
             } else {
                 if (!tiedFromPrev) {
                     const [low, high] = pattern.voices(degree);
-                    upperPitch = degree_to_pitch(tonic, high, 0);
-                    lowerPitch = degree_to_pitch(tonic, low, -1);
+                    upperPitch = spell_scale_degree(tonic, high, MAJOR_STEPS, 0);
+                    lowerPitch = spell_scale_degree(tonic, low, MAJOR_STEPS, -1);
                     degree++;
                 }
                 upperMeasure.push({ duration: note.duration, rest: false, pitch: upperPitch, tie: note.tie });
