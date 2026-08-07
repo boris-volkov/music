@@ -1,17 +1,19 @@
 // Two-hand partimento patterns: the stock keyboard figures a partimento student drills
 // until they sit under the fingers -- scale runs in parallel thirds and sixths, and the
-// sequences that alternate between the two. Plain quarter notes for now.
+// sequences that alternate between the two.
 //
 // Every pattern is written in scale-degree space rather than in notes, so the root the
 // practice options pick transposes the whole thing and no pattern has to know anything
 // about keys. A pattern is just (index) -> [lower degree, upper degree], continuing
 // forever, which is what lets any number of measures be asked for without a phrase
-// getting cut off mid-shape.
+// getting cut off mid-shape. The index used to just be the beat number -- one degree pair
+// per quarter note -- but partimento_passage() now generates a real rhythm first (the same
+// engine, and so the same Note Types settings, a Generated rhythm uses) and advances the
+// index once per onset in it instead, so the index is a step count, not a beat count.
 //
 // These feed the rhythm trainer's engine: a pattern becomes the same passage shape a Bach
 // excerpt does, so the grand staff, playhead, metronome and note-matching all come along
-// for free -- and giving these notes something other than quarters later is a change to
-// this file alone.
+// for free.
 
 const LETTERS = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
 const LETTER_SEMITONES = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
@@ -140,14 +142,6 @@ partimento_types.list.forEach((structure, i) => {
     structure.button.title = PARTIMENTO_PATTERNS[i].detail;
 });
 
-function into_measures(notes_) {
-    const measures = [];
-    for (let i = 0; i < notes_.length; i += BEATS_PER_MEASURE) {
-        measures.push(notes_.slice(i, i + BEATS_PER_MEASURE));
-    }
-    return measures;
-}
-
 function partimento_passage() {
     // A pattern and a root, each drawn from its own row in the practice panel, and either
     // row can be emptied. get_random opens the panel and says so in the terminal, but the
@@ -166,17 +160,47 @@ function partimento_passage() {
     const pattern = chosen.pattern;
     const tonic = tonic_from_note_name(root.name);
 
-    const upper = [];
-    const lower = [];
-    for (let i = 0; i < rhythm_settings.measures * BEATS_PER_MEASURE; i++) {
-        const [low, high] = pattern.voices(i);
-        upper.push({ duration: 'q', rest: false, pitch: degree_to_pitch(tonic, high, 0) });
-        lower.push({ duration: 'q', rest: false, pitch: degree_to_pitch(tonic, low, -1) });
-    }
+    // One shared rhythm for both hands -- they move together (parallel thirds, sixths, or
+    // the exchange between them), so a single onset pattern is what keeps them reading as
+    // one musical idea rather than two independently-rhythmed lines. Built the same way a
+    // Generated rhythm is, which is what makes a partimento passage automatically respect
+    // whichever note types, rests and ties are switched on in the Note Types panel, with
+    // nothing partimento-specific needed to keep that in sync.
+    const rhythmMeasures = generate_rhythm_shape(rhythm_settings.measures);
+
+    // Walks that shared rhythm and hangs the pattern's next degree pair off every genuine
+    // new attack. A rest stays silent; a note tied in from the one before it repeats that
+    // note's pitch rather than advancing the pattern -- it's the same sustained attack,
+    // not a new step, exactly like a tie means anywhere else in this trainer.
+    let degree = 0;
+    let tiedFromPrev = false;
+    let upperPitch = null, lowerPitch = null;
+    const upper = [], lower = [];
+    rhythmMeasures.forEach((measure) => {
+        const upperMeasure = [], lowerMeasure = [];
+        measure.forEach((note) => {
+            if (note.rest) {
+                upperMeasure.push({ duration: note.duration, rest: true });
+                lowerMeasure.push({ duration: note.duration, rest: true });
+            } else {
+                if (!tiedFromPrev) {
+                    const [low, high] = pattern.voices(degree);
+                    upperPitch = degree_to_pitch(tonic, high, 0);
+                    lowerPitch = degree_to_pitch(tonic, low, -1);
+                    degree++;
+                }
+                upperMeasure.push({ duration: note.duration, rest: false, pitch: upperPitch, tie: note.tie });
+                lowerMeasure.push({ duration: note.duration, rest: false, pitch: lowerPitch, tie: note.tie });
+            }
+            tiedFromPrev = !!note.tie;
+        });
+        upper.push(upperMeasure);
+        lower.push(lowerMeasure);
+    });
 
     // one hand alone practises that hand's voice on its own, so it becomes the only voice
-    const primary = into_measures(left_only() ? lower : upper);
-    const bass = two_handed() ? into_measures(lower) : null;
+    const primary = left_only() ? lower : upper;
+    const bass = two_handed() ? lower : null;
 
     const hands = two_handed() ? 'both hands' : left_only() ? 'left hand' : 'right hand';
     const attribution = {

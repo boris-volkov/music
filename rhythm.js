@@ -120,6 +120,10 @@ function enabled_durations() {
     return DURATION_TYPES.map((d) => d.code).filter((code) => rhythm_settings.durations[code]);
 }
 
+function enabled_rest_durations() {
+    return DURATION_TYPES.map((d) => d.code).filter((code) => rhythm_settings.restDurations[code]);
+}
+
 // the note-types panel refuses to switch off the last of these three -- see fillable()
 // below for why a beat can always be completed as long as one of them stays on
 const ESSENTIAL_DURATIONS = ['q', '8', '16'];
@@ -390,11 +394,20 @@ function add_cross_measure_ties(measures) {
     }
 }
 
-function generate_rhythm() {
+// builds count measures of rhythm shape -- no pitches, just durations/rests/ties -- via
+// generate_measure(), plus the cross-measure tie pass that only makes sense once every
+// measure exists. Shared with partimento.js's partimento_passage(), so a partimento
+// passage's rhythm comes from the exact same settings-respecting code path a Generated
+// rhythm's does, rather than a second copy that could drift out of sync with it.
+function generate_rhythm_shape(count) {
     const measures = [];
-    for (let m = 0; m < rhythm_settings.measures; m++) measures.push(generate_measure());
+    for (let m = 0; m < count; m++) measures.push(generate_measure());
     add_cross_measure_ties(measures);
-    return finish_rhythm(measures);
+    return measures;
+}
+
+function generate_rhythm() {
+    return finish_rhythm(generate_rhythm_shape(rhythm_settings.measures));
 }
 
 // --- borrowed passages --------------------------------------------------------
@@ -449,7 +462,24 @@ function guard_unsafe_ties(measures) {
 // bars from unrelated pieces -- the point is to practise music that actually occurs
 function bach_excerpt() {
     const wanted = rhythm_settings.measures;
-    const candidates = BACH_EXCERPTS.filter((e) => e.s.length >= wanted);
+    // vocab/ties describe an excerpt's *whole* run, which can be longer than the window
+    // actually drawn from it (the random offset below) -- so this is a conservative
+    // filter, not a precise one: a long excerpt is excluded if any bar in it anywhere
+    // needs a duration that's off, even if the few bars offset happens to land on would
+    // have been fine. That's the side to err on -- it can only under-offer real passages,
+    // never serve one that doesn't fit -- and the caller already falls back to a
+    // generated rhythm when nothing matches.
+    //
+    // a duration counts as allowed here if it's on either as a note or as a rest --
+    // vocab doesn't distinguish which role a given occurrence played, so this can't be
+    // fully precise about "no eighth rests, but eighth notes are fine": it just avoids
+    // excluding a passage for a rest when the matching note duration is already allowed.
+    const allowed = new Set([...enabled_durations(), ...enabled_rest_durations()]);
+    const candidates = BACH_EXCERPTS.filter((e) =>
+        e.s.length >= wanted
+        && e.vocab.every((code) => allowed.has(code))
+        && (rhythm_settings.ties || !e.ties)
+    );
     if (candidates.length === 0) return null;
 
     const excerpt = random_element(candidates);
@@ -1153,8 +1183,9 @@ function next_rhythm() {
 
     let note = '';
     if (rhythm_settings.source === 'bach' && !passage) {
-        // no real passage runs that long -- say so rather than silently generating one
-        note = ' (no chorale passage that long — generated instead)';
+        // either no real passage runs that long, or none of the ones that do fit the
+        // enabled note types -- say so rather than silently generating one
+        note = ' (no matching chorale passage — generated instead)';
     }
     current_rhythm = passage || generate_rhythm();
 
@@ -1251,7 +1282,6 @@ const rhythm_note_types_tab = document.getElementById('rhythm_note_types_tab');
 const rhythm_duration_selection = document.getElementById('rhythm_duration_selection');
 const rhythm_rest_selection = document.getElementById('rhythm_rest_selection');
 const rhythm_tie_selection = document.getElementById('rhythm_tie_selection');
-const rhythm_duration_empty_note = document.getElementById('rhythm_duration_empty_note');
 
 // builds one row of pill buttons over DURATION_TYPES, backed by a settings object keyed
 // by duration code (rhythm_settings.durations or .restDurations) -- notes and rests are
@@ -1312,11 +1342,11 @@ function sync_duration_buttons() {
 }
 sync_duration_buttons();
 
-// note types, rests and ties only shape generated rhythms, and melody practice can only
-// come from a real passage -- swap the panel's content for an explanatory note whenever
-// none of it applies, rather than letting it look effective
+// note types, rests and ties now shape every source -- generate_measure() directly for
+// Generated and (through generate_rhythm_shape()) Partimento, and as a candidate filter
+// for Bach excerpts (see bach_excerpt()) -- so the panel itself no longer needs to hide or
+// grey out depending on which one is active
 function sync_generator_controls() {
-    const generated = rhythm_settings.source === 'generated';
     const set_enabled = (id, enabled) => {
         const input = document.getElementById(id);
         input.disabled = !enabled;
@@ -1324,12 +1354,6 @@ function sync_generator_controls() {
     };
     set_enabled('rhythm_source', !rhythm_settings.melody); // melody needs the pitched corpus
     set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
-
-    const durationsApply = generated && !melodic();
-    [rhythm_duration_selection, rhythm_rest_selection, rhythm_tie_selection].forEach((el) => {
-        el.style.display = durationsApply ? 'flex' : 'none';
-    });
-    rhythm_duration_empty_note.style.display = durationsApply ? 'none' : 'block';
 
     // ...and while partimento is up the control is pinned to Both, not merely greyed:
     // a disabled select still reading "Left" would be describing an exercise that is

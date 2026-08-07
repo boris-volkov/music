@@ -224,8 +224,7 @@ canvas {
 	gap: 16px;
 }
 
-#practice_empty_note,
-#rhythm_duration_empty_note {
+#practice_empty_note {
 	font-size: 13px;
 	color: var(--ink-soft);
 }
