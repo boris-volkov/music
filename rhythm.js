@@ -15,8 +15,22 @@ const MEASURES_PER_LINE = 4;
 const SCORE_MARGIN = 10;
 const FIRST_LINE_TOP = 20;    // baseline clearance above the first system
 const SYSTEM_GAP = 38;        // baseline clearance from one system's foot to the next one's head
-const STRIP_BASE_OFFSET = 14; // gap between the strip's underside and the staff's top line
+const STRIP_BASE_OFFSET = 22; // gap between the strip's underside and the staff's top line
 const STRIP_HEIGHT = 16;
+// when a system's tallest note reaches further above the staff than STRIP_BASE_OFFSET
+// alone clears -- several ledger lines up, easy to reach in scale practice -- the strip
+// has to move up out of its way rather than sit at a fixed distance and let the note's
+// stem run straight through it. This is the gap kept between the strip's underside and
+// that tallest note once it does.
+//
+// Generous on purpose: VexFlow's own getBoundingBox() -- what overflowAbove is measured
+// from -- turns out to under-report a note's true rendered reach by a wide margin on
+// ledger-heavy content (measured directly against actual rendered bounding boxes on a
+// one-octave bass-clef run: the API said 20, the real rendered extent was over 30). The
+// same gap would undersize the ordinary inter-system clearance too, not just the strip,
+// so this errs well past the worst case actually seen rather than the small buffer that
+// would be enough if the measurement itself were trustworthy.
+const STRIP_CLEARANCE_ABOVE_NOTES = 24;
 const PLAYHEAD_OVERHANG = 3;  // how far the playhead pokes out of the strip, top and bottom
 const GRAND_STAFF_GAP = 95;   // treble stave top to bass stave top, when both hands play
 const STAVE_TOP_INSET = 40;   // a stave's own y down to its top line -- VexFlow's fixed default
@@ -26,8 +40,16 @@ const STAFF_HEIGHT = 40;      // a stave's own top line to bottom line -- VexFlo
 // the canvas edge when the margin is otherwise this tight
 const BRACE_OVERHANG = 16;
 // however far a note's own reach (ledger lines, stems, accidentals) actually measures,
-// leave this much further clearance beyond it as breathing room
-const NOTE_OVERFLOW_MARGIN = 8;
+// leave this much further clearance beyond it as breathing room.
+//
+// Generous on purpose, same reasoning as STRIP_CLEARANCE_ABOVE_NOTES above: VexFlow's own
+// getBoundingBox() -- what that "however far" is measured from -- under-reports a note's
+// true rendered reach by a wide margin on ledger-heavy content, and an SVG clips its own
+// content to its declared height by default, so an undersized margin here doesn't just
+// look cramped, it can leave a note invisibly cut off at the edge. Confirmed directly:
+// notes clipped above the canvas at the old margin in ordinary high-octave scale practice,
+// gone once this covers the same measurement gap the strip fix already accounts for.
+const NOTE_OVERFLOW_MARGIN = 24;
 
 const rhythm_settings = {
     tempo: 80,
@@ -76,8 +98,16 @@ function left_only() {
     return !partimento_mode() && melodic() && rhythm_settings.hands === 'left';
 }
 
+// how many beats the ACTUAL passage on screen runs, not what the Measures setting says --
+// they agree for Generated/Bach/Partimento, which all size their output to
+// rhythm_settings.measures directly, but scale practice grows its own passage
+// independently (as many measures as it takes to cover every degree -- see
+// scale_practice_passage()), so relying on the setting instead of current_rhythm itself
+// would cut its playhead, metronome and scoring off partway through a longer scale.
+// Every caller here only runs once a passage exists (start_rhythm_run() guards on
+// current_rhythm before anything downstream can reach this), so it's always safe to ask.
 function total_beats() {
-    return rhythm_settings.measures * BEATS_PER_MEASURE;
+    return current_rhythm.measures.length * BEATS_PER_MEASURE;
 }
 
 // Timing tolerances, in seconds. Absolute rather than beat-relative on purpose: playing
@@ -135,6 +165,7 @@ const ESSENTIAL_DURATIONS = ['q', '8', '16'];
 let current_rhythm = null;
 let rhythm_staves = [];
 let rhythm_domains = []; // per measure: the {start, end} x-range one measure of time spans
+let rhythm_line_extents = []; // per system: how far its own notes reach above/below its staff
 let rhythm_hits = [];        // beat positions of the player's taps this run
 let rhythm_run_start = null; // audio-clock time that beat 0 lands on
 let rhythm_running = false;
@@ -776,6 +807,9 @@ function render_rhythm_score() {
             layout_system(scratchContext, firstIndex, count, 0, leftMargin, usable, grand, keySignature).extent
         );
     }
+    // draw_timing_strips() and beat_to_position() both need this to keep the strip (and
+    // the playhead/stamps riding on it) above whichever note in a system reaches highest
+    rhythm_line_extents = extents;
 
     // Pass 2: turn those measurements into a clearance above the first system, a gap
     // before every later one, and a margin below the last one, then draw for real at the
@@ -826,6 +860,16 @@ function render_rhythm_score() {
 // measure into even fractions of time, so the playhead sweeps smoothly across it and a
 // tap's mark can be compared against the grid line it was aiming for.
 
+// how far above a system's own top staff line the strip's underside needs to sit --
+// normally just STRIP_BASE_OFFSET, but pushed higher whenever this system's own tallest
+// note (several ledger lines up, easy to reach in scale practice) would otherwise run
+// straight through it. draw_timing_strips() (the strip itself) and beat_to_position()
+// (the playhead and tap stamps riding on it) both call this, so neither can drift out of
+// sync with where the other actually put it.
+function strip_offset(overflowAbove) {
+    return Math.max(STRIP_BASE_OFFSET, overflowAbove + STRIP_CLEARANCE_ABOVE_NOTES);
+}
+
 function svg_element(tag, attributes) {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
     Object.entries(attributes).forEach(([k, v]) => el.setAttribute(k, v));
@@ -843,7 +887,7 @@ function draw_timing_strips() {
     for (let line = 0; line < lineCount; line++) {
         const firstIndex = line * MEASURES_PER_LINE;
         const lastIndex = Math.min(firstIndex + MEASURES_PER_LINE, rhythm_staves.length) - 1;
-        const bottomY = rhythm_staves[firstIndex].getYForLine(0) - STRIP_BASE_OFFSET;
+        const bottomY = rhythm_staves[firstIndex].getYForLine(0) - strip_offset(rhythm_line_extents[line].overflowAbove);
         const topY = bottomY - STRIP_HEIGHT;
         const left = rhythm_domains[firstIndex].start;
         const right = rhythm_domains[lastIndex].end;
@@ -906,6 +950,7 @@ function draw_timing_strips() {
 function beat_to_position(beat) {
     const clamped = Math.max(0, Math.min(beat, total_beats()));
     const mi = Math.min(rhythm_staves.length - 1, Math.floor(clamped / BEATS_PER_MEASURE));
+    const line = Math.floor(mi / MEASURES_PER_LINE);
     const stave = rhythm_staves[mi];
     const { start, end } = rhythm_domains[mi];
     const withinMeasure = (clamped - mi * BEATS_PER_MEASURE) / BEATS_PER_MEASURE;
@@ -914,7 +959,7 @@ function beat_to_position(beat) {
         x: start + withinMeasure * (end - start),
         top,
         bottom: stave.getYForLine(4),
-        stripTop: top - STRIP_BASE_OFFSET - STRIP_HEIGHT,
+        stripTop: top - strip_offset(rhythm_line_extents[line].overflowAbove) - STRIP_HEIGHT,
     };
 }
 
