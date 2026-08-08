@@ -671,33 +671,94 @@ function build_stave_ties(measure, notes) {
 // is appended to `pendingBrackets` rather than drawn on the spot: its start note may
 // come from an earlier column, but layout_system() draws every bracket only after the
 // whole system's notes are down, so draw order never has to match column order.
+//
+// Also tracks `reachY`, the actual pixel extreme (topmost point for an above-the-staff
+// run, bottommost for a below-the-staff one) the run's own notes reach -- read straight
+// off each note's own getBoundingBox() as it's added. draw_ottava_brackets() positions
+// the bracket relative to this, not to the stave, because VexFlow's own TextBracket
+// doesn't: see the comment there for why that matters.
 function track_ottava(notes, shifts, state, pendingBrackets, clef) {
     notes.forEach((note, i) => {
         const shift = shifts[i];
         if (shift === null) return; // a rest, or no pitch at all -- the run just spans over it
         if (shift !== state.shift) {
             if (state.shift !== 0) {
-                pendingBrackets.push({ start: state.start, stop: state.lastReal, shift: state.shift, clef });
+                pendingBrackets.push({ start: state.start, stop: state.lastReal, shift: state.shift, clef, reachY: state.reachY });
             }
             state.shift = shift;
             state.start = shift !== 0 ? note : null;
+            state.reachY = null;
+        }
+        if (shift !== 0) {
+            const bb = note.getBoundingBox();
+            const y = shift > 0 ? bb.y : bb.y + bb.h;
+            state.reachY = state.reachY === null ? y : (shift > 0 ? Math.min(state.reachY, y) : Math.max(state.reachY, y));
         }
         state.lastReal = note;
     });
 }
 
+// converts a target pixel y into whatever "line" value a stave's own
+// getYForTopText()/getYForBottomText() would need to land there, by sampling the (affine,
+// so two points fully determine it) relationship those methods actually implement rather
+// than assuming a formula -- same "measure the real object, don't guess" reasoning as
+// stave_overhead() above.
+//
+// TextBracket's own draw() calls getYForBottomText(this.line + TEXT_HEIGHT_OFFSET_HACK)
+// for a BOTTOM bracket -- an internal constant this file has no access to -- but leaves
+// a TOP one untouched. Checked directly (drawing real brackets at known .line values and
+// reading back where VexFlow actually put them): TOP matches getYForTopText(line)
+// exactly; BOTTOM lands one whole line further down than getYForBottomText(line) alone
+// says. Subtracting 1 here for the BOTTOM case is what cancels that back out, so the
+// value this returns is always what setLine() should actually be given, not what
+// getYForBottomText() alone would need.
+function line_for_y(stave, above, targetY) {
+    const yAt = (line) => above ? stave.getYForTopText(line) : stave.getYForBottomText(line);
+    const y0 = yAt(0), y1 = yAt(1);
+    const perLine = y1 - y0;
+    const line = perLine ? (targetY - y0) / perLine : 1;
+    return above ? line : line - 1;
+}
+
+// context.measureText() on VexFlow's SVG backend always answers {width: 0, height: 0} --
+// checked directly, on the real, on-screen rendering path, not just in isolation -- which
+// breaks TextBracket's own draw(): it uses the measurement to place the superscript after
+// the numeral (so "va" lands 1px after "8" instead of after it, visibly overlapping) and
+// to know where the numeral+suffix end so the dashed line can start past them (so the
+// line starts right under the label instead of past it). TextBracket only ever measures
+// the handful of fixed strings a bracket's numeral and suffix can be, at its own fixed
+// font sizes, so this stands in with real numbers for exactly that fixed set rather than
+// trying to be a general replacement.
+const OTTAVA_TEXT_WIDTH = { 8: 9, 15: 16, va: 11, vb: 12, ma: 14, mb: 15, '': 0 };
+function ottava_measure_text(text) {
+    const width = OTTAVA_TEXT_WIDTH[text] ?? text.length * 8;
+    return { width, height: 12 };
+}
+
 // draws every closed-or-still-open ottava run collected while laying out one system.
 // Bracket position follows the sign of the shift -- above the staff for 8va/15ma
 // (played higher than written), below it for 8vb/15mb (played lower) -- the same
-// convention the shift itself already encodes.
+// convention the shift itself already encodes. Built on VexFlow's own TextBracket for
+// the actual drawing (styling, dash pattern, the little closing tick are all its), but
+// its vertical position is overridden via setLine() -- worked out from the real notes'
+// own reach (`reachY`, tracked above) rather than TextBracket's default, which is a fixed
+// offset off the *stave* and never rises for a run that climbs past ordinary ledger-line
+// range, exactly the case this exists to handle -- and its text measurement is patched
+// for the same draw() call, for the reason ottava_measure_text() above explains.
 function draw_ottava_brackets(context, pendingBrackets) {
     const VF = Vex.Flow;
-    pendingBrackets.forEach(({ start, stop, shift }) => {
-        const label = OTTAVA_LABEL[Math.abs(shift)][shift > 0 ? 'up' : 'down'];
-        const position = shift > 0 ? VF.TextBracketPosition.TOP : VF.TextBracketPosition.BOTTOM;
-        new VF.TextBracket({ start, stop, text: label.text, superscript: label.superscript, position })
-            .setContext(context).draw();
+    const realMeasureText = context.measureText;
+    context.measureText = ottava_measure_text;
+    pendingBrackets.forEach(({ start, stop, shift, reachY }) => {
+        const above = shift > 0;
+        const label = OTTAVA_LABEL[Math.abs(shift)][above ? 'up' : 'down'];
+        const position = above ? VF.TextBracketPosition.TOP : VF.TextBracketPosition.BOTTOM;
+        const targetY = above ? reachY - OTTAVA_BRACKET_CLEARANCE : reachY + OTTAVA_BRACKET_CLEARANCE;
+        const bracket = new VF.TextBracket({ start, stop, text: label.text, superscript: label.superscript, position });
+        bracket.setLine(line_for_y(start.checkStave(), above, targetY));
+        bracket.setContext(context).draw();
     });
+    context.measureText = realMeasureText;
 }
 
 // Lays out and draws one line (system) of the score into `context` at `topY`, and
@@ -747,8 +808,8 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
     let carryLowerTie = null;
 
     // ottava runs, tracked the same way across columns -- see track_ottava()
-    const upperOttava = { shift: 0, start: null, lastReal: null };
-    const lowerOttava = { shift: 0, start: null, lastReal: null };
+    const upperOttava = { shift: 0, start: null, lastReal: null, reachY: null };
+    const lowerOttava = { shift: 0, start: null, lastReal: null, reachY: null };
     const pendingBrackets = [];
 
     let x = leftMargin;
@@ -797,8 +858,6 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
         const lowerBuilt = bassStave ? build_stave_notes(current_rhythm.bass[mi], 'bass') : null;
         const lowerNotes = lowerBuilt ? lowerBuilt.notes : null;
         const lowerShifts = lowerBuilt ? lowerBuilt.shifts : null;
-        track_ottava(upperNotes, upperShifts, upperOttava, pendingBrackets, upper_clef());
-        if (lowerNotes) track_ottava(lowerNotes, lowerShifts, lowerOttava, pendingBrackets, 'bass');
 
         const voices = [];
         const makeVoice = (notes) => {
@@ -835,6 +894,11 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
         if (lowerVoice) lowerVoice.setContext(context).setStave(bassStave).draw();
         beams.forEach((beam) => beam.setContext(context).draw());
         ties.forEach((tie) => tie.setContext(context).draw());
+
+        // only safe once the notes above are actually drawn -- track_ottava() reads each
+        // note's real getBoundingBox(), which throws on an unformatted note
+        track_ottava(upperNotes, upperShifts, upperOttava, pendingBrackets, upper_clef());
+        if (lowerNotes) track_ottava(lowerNotes, lowerShifts, lowerOttava, pendingBrackets, 'bass');
 
         const upperMeasure = current_rhythm.measures[mi];
         carryUpperTie = upperMeasure[upperMeasure.length - 1].tie ? upperNotes[upperNotes.length - 1] : null;
@@ -888,10 +952,10 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
     // engraving re-states 8va at the start of a new system rather than drawing one
     // continuous bracket across the gap.
     if (upperOttava.shift !== 0) {
-        pendingBrackets.push({ start: upperOttava.start, stop: upperOttava.lastReal, shift: upperOttava.shift, clef: upper_clef() });
+        pendingBrackets.push({ start: upperOttava.start, stop: upperOttava.lastReal, shift: upperOttava.shift, clef: upper_clef(), reachY: upperOttava.reachY });
     }
     if (lowerOttava.shift !== 0) {
-        pendingBrackets.push({ start: lowerOttava.start, stop: lowerOttava.lastReal, shift: lowerOttava.shift, clef: 'bass' });
+        pendingBrackets.push({ start: lowerOttava.start, stop: lowerOttava.lastReal, shift: lowerOttava.shift, clef: 'bass', reachY: lowerOttava.reachY });
     }
     draw_ottava_brackets(context, pendingBrackets);
 
