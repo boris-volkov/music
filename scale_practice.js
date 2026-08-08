@@ -68,12 +68,23 @@ function scale_practice_passage() {
     const preferFlats = root.name.includes('♭');
     const steps = chosenScale.notes;
     const degrees = scale_degrees(steps.length, scale_practice_settings.octaves);
-    // absolute octaves (right hand around 4, left around 3, a real octave apart) --
-    // spell_scale_degree()'s own convention is a shift relative to the tonic's octave,
-    // which tonic_from_note_name() picks per root rather than always landing on 4, so this
-    // works out whatever shift actually gets there for whichever root got chosen
-    const upperShift = 4 - tonic.octave;
-    const lowerShift = 3 - tonic.octave;
+    // absolute octaves (right hand around 4, left around 3, a real octave apart) when
+    // there's only one octave to climb -- dropped a further octave once there's more than
+    // one, since a scale only ever climbs from its starting note, never dips below it, so
+    // the starting octave is also the passage's floor, and two or three octaves stacked on
+    // top of the usual middle-of-the-staff start sent most scales well past the staff at
+    // the top. spell_scale_degree()'s own convention is a shift relative to the tonic's
+    // octave, which tonic_from_note_name() picks per root rather than always landing on a
+    // fixed one, so this works out whatever shift actually gets there for whichever root
+    // got chosen.
+    //
+    // Only dropped for two-or-more octaves, not unconditionally: a single octave already
+    // starts as low as the treble staff comfortably allows -- some roots (C through F#)
+    // would dip below its own ledger-line floor and pick up a needless 8vb on what's
+    // meant to be the simplest, most beginner-friendly case if this applied there too.
+    const octaveDrop = scale_practice_settings.octaves > 1 ? 1 : 0;
+    const upperShift = (4 - octaveDrop) - tonic.octave;
+    const lowerShift = (3 - octaveDrop) - tonic.octave;
 
     // enough rhythm to cover every degree at least once. Regenerated fresh at each
     // candidate length rather than grown incrementally -- a handful of extra
