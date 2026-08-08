@@ -629,9 +629,14 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
     );
     const plainOverhead = stave_overhead(null, false, null);
 
-    // every measure gets an identical note-area width, so the playhead keeps one
-    // constant speed across the whole line and no gap opens up at the barlines
-    const noteAreaWidth = (usable - leadOverhead) / count;
+    // every measure gets an identical note-area width -- sized off a full line
+    // (MEASURES_PER_LINE), not however many measures actually land on this one. That's
+    // what keeps the playhead one constant speed across every line a passage draws, and
+    // is also why a short last line (down to a single lone measure) just leaves the rest
+    // of the line blank instead of stretching its few measures out to fill it -- a
+    // stretched-thin final measure would otherwise force the tempo slider into unusably
+    // fast territory just to keep up with how wide it got drawn.
+    const noteAreaWidth = (usable - leadOverhead) / MEASURES_PER_LINE;
 
     let upperTop = Infinity, upperBottom = -Infinity;
     let lowerTop = Infinity, lowerBottom = -Infinity;
@@ -649,7 +654,11 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
     for (let column = 0; column < count; column++) {
         const mi = firstIndex + column;
         let staveWidth;
-        if (count === 1) staveWidth = usable;
+        // a lone measure is simultaneously the first column (needs leadOverhead for the
+        // clef/key/time signature) and the last (needs plainOverhead of trailing room for
+        // its closing barline) -- the two adjustments below combine cleanly since they
+        // cancel the plainOverhead term the first-column case otherwise subtracts back out
+        if (count === 1) staveWidth = noteAreaWidth + leadOverhead;
         else if (column === 0) staveWidth = noteAreaWidth + leadOverhead - plainOverhead;
         else if (column === count - 1) staveWidth = noteAreaWidth + plainOverhead;
         else staveWidth = noteAreaWidth;
