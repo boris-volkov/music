@@ -50,6 +50,13 @@ const BRACE_OVERHANG = 16;
 // notes clipped above the canvas at the old margin in ordinary high-octave scale practice,
 // gone once this covers the same measurement gap the strip fix already accounts for.
 const NOTE_OVERFLOW_MARGIN = 24;
+// an ottava bracket's dashed line and "8va"/"15ma" label reach a bit further than the
+// notehead it's attached to; TextBracket exposes no getBoundingBox() to measure that
+// reach directly (checked: its prototype has draw/setDashed/setLine and nothing else),
+// so this is a deliberately generous estimate -- bracket_height (8, VexFlow's own
+// default) plus room for the label and its own gap off the note -- in the same spirit
+// as NOTE_OVERFLOW_MARGIN above rather than a measured figure.
+const OTTAVA_BRACKET_CLEARANCE = 24;
 
 const rhythm_settings = {
     tempo: 80,
@@ -474,6 +481,47 @@ function pitch_to_midi(pitch) {
     return (octave + 1) * 12 + semitones;
 }
 
+// --- ottava (8va/15ma) ----------------------------------------------------------
+// Piano convention: rather than stacking more than about three ledger lines, notes that
+// run that far past the staff get written an octave (or two) closer to it and flagged
+// with a dashed bracket saying how much higher (8va, or 15ma for two octaves) or lower
+// (8vb/15mb) to actually play them than written. The thresholds below -- the third
+// ledger line above or below each clef's staff -- are a common rule of thumb for where
+// to bring that in (see e.g. Elaine Gould's Behind Bars).
+const OTTAVA_THRESHOLD = {
+    treble: { high: pitch_to_midi('e6'), low: pitch_to_midi('f3') },
+    bass: { high: pitch_to_midi('g4'), low: pitch_to_midi('a1') },
+};
+// the numeral and suffix for each combination of how far (one octave: "8"; two: "15")
+// and which direction -- above the staff is played higher than written ("va", ottava
+// alta, or "ma", quindicesima alta), below is played lower ("vb"/"mb", ...bassa). The
+// suffix depends on both, not just direction -- two octaves up is "15ma", never "15va".
+const OTTAVA_LABEL = {
+    1: { up: { text: '8', superscript: 'va' }, down: { text: '8', superscript: 'vb' } },
+    2: { up: { text: '15', superscript: 'ma' }, down: { text: '15', superscript: 'mb' } },
+};
+
+// how many octaves, and which direction, a pitch needs shifted to read within three
+// ledger lines of its clef's staff -- positive shifts the notation down (8va/15ma,
+// played higher than written), negative shifts it up (8vb/15mb, played lower than
+// written), 0 means it already reads fine as written. Capped at two octaves either way:
+// a third would need an already-absurd range nothing this trainer generates reaches.
+function ottava_shift(pitch, clef) {
+    const bounds = OTTAVA_THRESHOLD[clef];
+    if (!bounds) return 0;
+    const midi = pitch_to_midi(pitch);
+    if (midi > bounds.high) return Math.min(2, Math.ceil((midi - bounds.high) / 12));
+    if (midi < bounds.low) return -Math.min(2, Math.ceil((bounds.low - midi) / 12));
+    return 0;
+}
+
+// shifts a pitch string down (positive) or up (negative) by whole octaves for display --
+// the underlying note.pitch that drives playback and scoring is never touched, only this
+// copy handed to VexFlow for where to actually draw it
+function shift_pitch_octave(pitch, shift) {
+    return pitch.slice(0, -1) + (parseInt(pitch.slice(-1), 10) - shift);
+}
+
 // A tie the corpus kept is a fact about the real piece, not something under this
 // excerpt's control the way a generated tie is -- generate_rhythm() simply never opens
 // one at a spot it can't draw, but bach_excerpt() below slices a *random* window out of
@@ -565,14 +613,24 @@ function upper_clef() {
 // caused a bass-staff rest to float several ledger lines up into the staff above it.
 const CLEF_MIDDLE_LINE = { treble: 'b/4', bass: 'd/3', percussion: 'b/4' };
 
+// alongside the notes themselves, returns the ottava shift (see above) actually applied
+// to each one -- null for a rest or anything outside melody mode, where the idea doesn't
+// apply and the run-tracking in layout_system() should just look straight through it
+// rather than reading it as "back in range"
 function build_stave_notes(measure, clef) {
     const VF = Vex.Flow;
     const restKey = CLEF_MIDDLE_LINE[clef];
-    return measure.map((note) => {
+    const shifts = [];
+    const notes = measure.map((note) => {
+        // rhythm-only notation parks every note on the middle line; melody mode puts it
+        // at its written pitch (nudged into range by the ottava shift, if any), and a
+        // rest at the clef's own middle line
+        const usesPitch = melodic() && note.pitch;
+        const shift = usesPitch ? ottava_shift(note.pitch, clef) : null;
+        shifts.push(shift);
+        const displayPitch = shift ? shift_pitch_octave(note.pitch, shift) : note.pitch;
         const options = {
-            // rhythm-only notation parks every note on the middle line; melody mode puts
-            // it at its written pitch, and a rest at the clef's own middle line
-            keys: [melodic() && note.pitch ? pitch_to_vexkey(note.pitch) : restKey],
+            keys: [usesPitch ? pitch_to_vexkey(displayPitch) : restKey],
             duration: note.rest ? note.duration + 'r' : note.duration,
             clef, // without this the bass staff would place notes as if it were treble
         };
@@ -585,6 +643,7 @@ function build_stave_notes(measure, clef) {
         if (note.duration.endsWith('d')) VF.Dot.buildAndAttach([staveNote], { all: true });
         return staveNote;
     });
+    return { notes, shifts };
 }
 
 // the curved tie marks for whichever notes in this measure add_ties() tagged -- built
@@ -602,6 +661,43 @@ function build_stave_ties(measure, notes) {
         }
     });
     return ties;
+}
+
+// walks one column's notes against whichever ottava run is already open (if any) for
+// this voice, closing it into a bracket descriptor the moment the shift changes and
+// opening a new one if the new value isn't 0. `state` is carried in from the caller and
+// mutated in place so the run survives from one column to the next exactly the way a
+// pending tie does -- see carryUpperTie/carryLowerTie in layout_system(). A closed run
+// is appended to `pendingBrackets` rather than drawn on the spot: its start note may
+// come from an earlier column, but layout_system() draws every bracket only after the
+// whole system's notes are down, so draw order never has to match column order.
+function track_ottava(notes, shifts, state, pendingBrackets, clef) {
+    notes.forEach((note, i) => {
+        const shift = shifts[i];
+        if (shift === null) return; // a rest, or no pitch at all -- the run just spans over it
+        if (shift !== state.shift) {
+            if (state.shift !== 0) {
+                pendingBrackets.push({ start: state.start, stop: state.lastReal, shift: state.shift, clef });
+            }
+            state.shift = shift;
+            state.start = shift !== 0 ? note : null;
+        }
+        state.lastReal = note;
+    });
+}
+
+// draws every closed-or-still-open ottava run collected while laying out one system.
+// Bracket position follows the sign of the shift -- above the staff for 8va/15ma
+// (played higher than written), below it for 8vb/15mb (played lower) -- the same
+// convention the shift itself already encodes.
+function draw_ottava_brackets(context, pendingBrackets) {
+    const VF = Vex.Flow;
+    pendingBrackets.forEach(({ start, stop, shift }) => {
+        const label = OTTAVA_LABEL[Math.abs(shift)][shift > 0 ? 'up' : 'down'];
+        const position = shift > 0 ? VF.TextBracketPosition.TOP : VF.TextBracketPosition.BOTTOM;
+        new VF.TextBracket({ start, stop, text: label.text, superscript: label.superscript, position })
+            .setContext(context).draw();
+    });
 }
 
 // Lays out and draws one line (system) of the score into `context` at `topY`, and
@@ -650,6 +746,11 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
     let carryUpperTie = null;
     let carryLowerTie = null;
 
+    // ottava runs, tracked the same way across columns -- see track_ottava()
+    const upperOttava = { shift: 0, start: null, lastReal: null };
+    const lowerOttava = { shift: 0, start: null, lastReal: null };
+    const pendingBrackets = [];
+
     let x = leftMargin;
     for (let column = 0; column < count; column++) {
         const mi = firstIndex + column;
@@ -692,10 +793,12 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
         const start = stave.getNoteStartX();
         domains.push({ start, end: start + noteAreaWidth });
 
-        const upperNotes = build_stave_notes(current_rhythm.measures[mi], upper_clef());
-        const lowerNotes = bassStave
-            ? build_stave_notes(current_rhythm.bass[mi], 'bass')
-            : null;
+        const { notes: upperNotes, shifts: upperShifts } = build_stave_notes(current_rhythm.measures[mi], upper_clef());
+        const lowerBuilt = bassStave ? build_stave_notes(current_rhythm.bass[mi], 'bass') : null;
+        const lowerNotes = lowerBuilt ? lowerBuilt.notes : null;
+        const lowerShifts = lowerBuilt ? lowerBuilt.shifts : null;
+        track_ottava(upperNotes, upperShifts, upperOttava, pendingBrackets, upper_clef());
+        if (lowerNotes) track_ottava(lowerNotes, lowerShifts, lowerOttava, pendingBrackets, 'bass');
 
         const voices = [];
         const makeVoice = (notes) => {
@@ -776,6 +879,31 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
 
         x += staveWidth;
     }
+
+    // a run still open at the end of the system closes at the last real note this
+    // system actually drew -- add_cross_measure_ties() and guard_unsafe_ties() already
+    // establish that a phrase can't rely on carrying anything *else* across a system
+    // break, and an ottava bracket is no different: if the excursion continues onto the
+    // next line, that line's own first note simply opens a fresh one, the same way real
+    // engraving re-states 8va at the start of a new system rather than drawing one
+    // continuous bracket across the gap.
+    if (upperOttava.shift !== 0) {
+        pendingBrackets.push({ start: upperOttava.start, stop: upperOttava.lastReal, shift: upperOttava.shift, clef: upper_clef() });
+    }
+    if (lowerOttava.shift !== 0) {
+        pendingBrackets.push({ start: lowerOttava.start, stop: lowerOttava.lastReal, shift: lowerOttava.shift, clef: 'bass' });
+    }
+    draw_ottava_brackets(context, pendingBrackets);
+
+    // a bracket reaches past the bare notehead its extent would otherwise be measured
+    // from -- widen whichever side it actually sits on so overflowAbove/overflowBelow/
+    // innerOverflow below give it real clearance instead of clipping its label the same
+    // way tall notes used to clip against the timing strip before that got fixed
+    pendingBrackets.forEach(({ shift, clef }) => {
+        const upper = clef === upper_clef();
+        if (shift > 0) { if (upper) upperTop -= OTTAVA_BRACKET_CLEARANCE; else lowerTop -= OTTAVA_BRACKET_CLEARANCE; }
+        else { if (upper) upperBottom += OTTAVA_BRACKET_CLEARANCE; else lowerBottom += OTTAVA_BRACKET_CLEARANCE; }
+    });
 
     const overflowAbove = Math.max(0, upperTopLineY - upperTop);
     const overflowBelow = Math.max(0, (grand ? lowerBottom : upperBottom) - (grand ? bottomLineY : upperBottomLineY));
