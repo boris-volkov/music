@@ -13,9 +13,9 @@ function random_interval(){
 const interval_callback = make_chord_style_callback(() => interval_array, random_interval);
 
 function init_interval(){
-    set_relevant_options(['notes', 'intervals']);
+    set_topic_ui('intervals', ['notes', 'intervals']);
     canvas.style.display = 'none';
     init_quiz(random_interval, interval_callback);
 }
 
-add_game_button('Play from Description', init_interval, 'menu_intervals', 'clay');
+add_game_button('Intervals', init_interval, 'menu_theory', 'theory');

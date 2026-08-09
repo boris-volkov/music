@@ -180,7 +180,7 @@ function init_partimento() {
     // and sync_generator_controls pins and greys the control to match
     sync_generator_controls();
     // the roots come from the note pickers, the figures from their own row beneath them
-    init_rhythm_panel(['notes', 'partimento']);
+    init_rhythm_panel('partimento', ['notes', 'partimento']);
 }
 
-add_game_button('Patterns', init_partimento, 'menu_partimento', 'amber');
+add_game_button('Patterns', init_partimento, 'menu_patterns', 'patterns');

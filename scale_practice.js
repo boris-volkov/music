@@ -159,7 +159,7 @@ function init_scale_practice() {
     rhythm_settings.source = 'scales';
     document.getElementById('rhythm_source').value = 'scales';
     sync_generator_controls();
-    init_rhythm_panel(['notes', 'scales']);
+    init_rhythm_panel('modes', ['notes', 'scales']);
 }
 
 document.getElementById('scale_octaves').addEventListener('change', (e) => {
@@ -167,4 +167,4 @@ document.getElementById('scale_octaves').addEventListener('change', (e) => {
     next_rhythm();
 });
 
-add_game_button('Modes', init_scale_practice, 'menu_chords_scales', 'clay');
+add_game_button('Modes', init_scale_practice, 'menu_theory', 'theory');

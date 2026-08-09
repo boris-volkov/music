@@ -14,259 +14,278 @@
 
 <body>
     <div id = "outer">
-        <div id = "menu_bar">
-            <button id = "full_screen" class="menu_tab" title="Toggle fullscreen">&#9974;</button>
-            <button class="menu_tab" data-panel="panel_practice">&#9881; Practice</button>
-            <button class="menu_tab" data-panel="panel_audio">&#9835; Audio</button>
-            <button class="menu_tab" data-panel="panel_controls">&#9000; Controls</button>
-            <button id = "rhythm_note_types_tab" class="menu_tab" data-panel="panel_rhythm_notes" disabled>&#9834; Note Types</button>
-            <button id = "notation_toggle" title="Toggle musical notation">&#9834; Notation</button>
-            <span id = "midi_status" title="MIDI access status">●</span>
-        </div>
+        <div id = "rail">
+            <div id = "rail_title">
+                <div id = "rail_title_main">Music Theory</div>
+                <div id = "rail_title_sub">PRACTICE</div>
+            </div>
 
-        <div id = "panel_practice" class="option_panel" style="display: none">
-            <div class="choice_holder" data-section="notes">
-                <div class="selection_title">base notes of chords, intervals, and scales</div>
-                <div id = "note_types" class="selection"></div>
+            <div class="rail_group">
+                <div class="rail_group_label">Reading</div>
+                <div class="rail_group_body" id = "menu_reading"></div>
             </div>
-            <div class="choice_holder" data-section="note_reading">
-                <div class="selection_title">clef</div>
-                <div id = "note_clef_selection" class="selection"></div>
+            <div class="rail_group">
+                <div class="rail_group_label">Ear</div>
+                <div class="rail_group_body" id = "menu_ear"></div>
             </div>
-            <div class="choice_holder" data-section="intervals">
-                <div class="selection_title">intervals</div>
-                <div id = "interval_types" class="selection"></div>
+            <div class="rail_group">
+                <div class="rail_group_label">Theory</div>
+                <div class="rail_group_body" id = "menu_theory"></div>
             </div>
-            <div class="choice_holder" data-section="chords">
-                <div class="selection_title">chords</div>
-                <div id = "chord_types" class="selection"></div>
+            <div class="rail_group">
+                <div class="rail_group_label">Timing</div>
+                <div class="rail_group_body" id = "menu_timing"></div>
             </div>
-            <div class="choice_holder" data-section="scales">
-                <div class="selection_title">scales and modes</div>
-                <div id = "scale_types" class="selection"></div>
+            <div class="rail_group">
+                <div class="rail_group_label">Patterns</div>
+                <div class="rail_group_body" id = "menu_patterns"></div>
             </div>
-            <div class="choice_holder" data-section="partimento">
-                <div class="selection_title">partimento patterns</div>
-                <div id = "partimento_types" class="selection"></div>
-            </div>
-            <div id = "practice_empty_note">This activity has no note choices to make.</div>
-        </div>
 
-        <div id = "panel_audio" class="option_panel" style="display: none">
-            <div class="choice_holder">
-                <div class="selection_title">playback</div>
-                <div class="selection sound_settings">
-                    <label>
-                        <span class="control_label">Play through</span>
-                        <select id = "playback_output">
-                            <option value="midi" selected>MIDI instrument</option>
-                            <option value="synth">Built-in synth</option>
-                        </select>
-                        <span class="value_readout" id = "playback_output_note"></span>
-                    </label>
-                    <label>
-                        <span class="control_label">Note length</span>
-                        <input type="range" id = "synth_duration" min="0.1" max="2" step="0.1" value="1.0">
-                        <span class="value_readout" id = "synth_duration_value">1.0s</span>
-                    </label>
-                    <label>
-                        <span class="control_label">Gap</span>
-                        <input type="range" id = "synth_gap" min="0.1" max="2" step="0.1" value="0.5">
-                        <span class="value_readout" id = "synth_gap_value">0.5s</span>
-                    </label>
-                </div>
-            </div>
-            <div class="choice_holder">
-                <div class="selection_title">synth tone</div>
-                <div class="selection sound_settings">
-                    <label>
-                        <span class="control_label">Waveform</span>
-                        <select id = "synth_waveform">
-                            <option value="sine" selected>Sine</option>
-                            <option value="triangle">Triangle</option>
-                            <option value="sawtooth">Sawtooth</option>
-                            <option value="square">Square</option>
-                        </select>
-                    </label>
-                    <label>
-                        <span class="control_label">Detune</span>
-                        <input type="range" id = "synth_detune" min="0" max="30" step="1" value="6">
-                        <span class="value_readout" id = "synth_detune_value">6&cent;</span>
-                    </label>
-                    <label>
-                        <span class="control_label">Attack</span>
-                        <input type="range" id = "synth_attack" min="0" max="200" step="5" value="20">
-                        <span class="value_readout" id = "synth_attack_value">20ms</span>
-                    </label>
-                    <label>
-                        <span class="control_label">Release</span>
-                        <input type="range" id = "synth_release" min="10" max="400" step="10" value="80">
-                        <span class="value_readout" id = "synth_release_value">80ms</span>
-                    </label>
-                    <label>
-                        <span class="control_label">Volume</span>
-                        <input type="range" id = "synth_volume" min="0" max="50" step="1" value="16">
-                        <span class="value_readout" id = "synth_volume_value">16%</span>
-                    </label>
-                    <div class="sound_preview_buttons">
-                        <button id = "synth_preview_note">&#9658; note</button>
-                        <button id = "synth_preview_interval">&#9658; interval</button>
-                    </div>
-                </div>
+            <div id = "rail_footer">
+                <span id = "midi_status" title="MIDI access status"></span>
+                <span id = "rail_footer_label">MIDI</span>
             </div>
         </div>
 
-        <div id = "panel_controls" class="option_panel" style="display: none">
-            <div class="choice_holder">
-                <div class="selection_title">keyboard controls</div>
-                <div class="selection binding_list">
-                    <div class="binding_row" data-control="start_stop">
-                        <span class="binding_label">Start / stop a run</span>
-                        <span class="binding_key"></span>
-                        <button type="button">Set</button>
-                    </div>
-                    <div class="binding_row" data-control="replay">
-                        <span class="binding_label">Hear it again</span>
-                        <span class="binding_key"></span>
-                        <button type="button">Set</button>
-                    </div>
-                    <div class="binding_hint">Press Set, then play the key you want to use.</div>
+        <div id = "main_column">
+            <div id = "menu_bar">
+                <div id = "now_block">
+                    <span id = "now_tag">NOW</span>
+                    <span id = "now_name"></span>
                 </div>
-            </div>
-        </div>
+                <div id = "now_divider"></div>
 
-        <div id = "panel_rhythm_notes" class="option_panel" style="display: none">
-            <div class="choice_holder">
-                <div class="selection_title">note types</div>
-                <div id = "rhythm_duration_selection" class="selection"></div>
-            </div>
-            <div class="choice_holder">
-                <div class="selection_title">rests</div>
-                <div id = "rhythm_rest_selection" class="selection"></div>
-            </div>
-            <div class="choice_holder">
-                <div class="selection_title">ties</div>
-                <div id = "rhythm_tie_selection" class="selection"></div>
-            </div>
-        </div>
+                <!-- Notation, Practice and Note types are hidden by default and shown per
+                     topic by set_topic_ui() (buttons.js) -- only the games that actually use
+                     them should ever show them. Audio and Keys apply everywhere, so they're
+                     always on. -->
+                <button id = "notation_toggle" class="menu_tab" style="display: none" title="Toggle musical notation">Notation</button>
+                <button class="menu_tab" data-panel="panel_practice" style="display: none"></button>
+                <button id = "rhythm_note_types_tab" class="menu_tab" data-panel="panel_rhythm_notes" style="display: none" disabled>Note types</button>
+                <button class="menu_tab" data-panel="panel_audio">Audio</button>
+                <button class="menu_tab" data-panel="panel_controls">Keys</button>
 
-        <div id = "app_grid">
-            <div id = "left_column">
-                <div id = "game_choices">
-                    <div class="menu_panel">
-                        <div class="menu_panel_header">Base Notes</div>
-                        <div class="menu_panel_body" id = "menu_base_notes"></div>
-                    </div>
-                    <div class="menu_panel">
-                        <div class="menu_panel_header">Intervals</div>
-                        <div class="menu_panel_body" id = "menu_intervals"></div>
-                    </div>
-                    <div class="menu_panel">
-                        <div class="menu_panel_header">Chords &amp; Scales</div>
-                        <div class="menu_panel_body" id = "menu_chords_scales"></div>
-                    </div>
-                    <div class="menu_panel">
-                        <div class="menu_panel_header">Timing</div>
-                        <div class="menu_panel_body" id = "menu_rhythm"></div>
-                    </div>
-                    <div class="menu_panel">
-                        <div class="menu_panel_header">Partimento</div>
-                        <div class="menu_panel_body" id = "menu_partimento"></div>
-                    </div>
+                <div id = "bar_right">
+                    <span id = "scope_readout"></span>
+                    <button id = "full_screen" title="Toggle fullscreen">⛶</button>
                 </div>
             </div>
-            <div id = "right_column">
-                <div id = "quiz_controls">
-                    <button id = "replay_button" style="display: none">&#9834; REPLAY</button>
+
+            <div id = "panel_practice" class="option_panel" style="display: none">
+                <div class="choice_holder" data-section="notes">
+                    <div class="selection_title">base notes of chords, intervals, and scales</div>
+                    <div id = "note_types" class="selection"></div>
                 </div>
-                <pre id = "terminal">Select a topic to begin.</pre>
-                <div id = "notation" style="display: none">
-                    <div id = "notation_score"></div>
+                <div class="choice_holder" data-section="note_reading">
+                    <div class="selection_title">clef</div>
+                    <div id = "note_clef_selection" class="selection"></div>
                 </div>
-                <div id = "rhythm_panel" style="display: none">
-                    <div id = "rhythm_controls">
-                        <button id = "rhythm_start">&#9658; START</button>
-                        <button id = "rhythm_new" title="Different passage">&#8635; NEW</button>
+                <div class="choice_holder" data-section="intervals">
+                    <div class="selection_title">intervals</div>
+                    <div id = "interval_types" class="selection"></div>
+                </div>
+                <div class="choice_holder" data-section="chords">
+                    <div class="selection_title">chords</div>
+                    <div id = "chord_types" class="selection"></div>
+                </div>
+                <div class="choice_holder" data-section="scales">
+                    <div class="selection_title">scales and modes</div>
+                    <div id = "scale_types" class="selection"></div>
+                </div>
+                <div class="choice_holder" data-section="partimento">
+                    <div class="selection_title">partimento patterns</div>
+                    <div id = "partimento_types" class="selection"></div>
+                </div>
+            </div>
+
+            <div id = "panel_audio" class="option_panel" style="display: none">
+                <div class="choice_holder">
+                    <div class="selection_title">playback</div>
+                    <div class="selection sound_settings">
                         <label>
-                            <span class="control_label">Tempo</span>
-                            <input type="range" id = "rhythm_tempo" min="40" max="160" step="5" value="80">
-                            <span class="value_readout" id = "rhythm_tempo_value">80 bpm</span>
+                            <span class="control_label">Play through</span>
+                            <select id = "playback_output">
+                                <option value="midi" selected>MIDI instrument</option>
+                                <option value="synth">Built-in synth</option>
+                            </select>
+                            <span class="value_readout" id = "playback_output_note"></span>
                         </label>
                         <label>
-                            <span class="control_label">Rhythms</span>
-                            <select id = "rhythm_source">
-                                <option value="generated" selected>Generated</option>
-                                <option value="bach">Bach chorales</option>
-                                <!-- never a real choice here -- only the Patterns topic button
-                                     puts you into partimento mode, since that also has to set up
-                                     the pattern picker and pin Hands, neither of which picking
-                                     this from the dropdown would do. Present only so this select
-                                     can still show "Partimento patterns" as its (locked) value
-                                     while that topic is active -- see sync_generator_controls(). -->
-                                <option value="partimento" disabled>Partimento patterns</option>
-                                <!-- same story as Partimento patterns above -- only the Modes
-                                     topic button puts you into scale practice -->
-                                <option value="scales" disabled>Scale practice</option>
-                            </select>
+                            <span class="control_label">Note length</span>
+                            <input type="range" id = "synth_duration" min="0.1" max="2" step="0.1" value="1.0">
+                            <span class="value_readout" id = "synth_duration_value">1.0s</span>
                         </label>
-                        <label id = "rhythm_measures_label">
-                            <span class="control_label">Measures</span>
-                            <select id = "rhythm_measures">
-                                <option value="2">2</option>
-                                <option value="4" selected>4</option>
-                                <option value="8">8</option>
-                                <option value="12">12</option>
-                                <option value="16">16</option>
-                            </select>
+                        <label>
+                            <span class="control_label">Gap</span>
+                            <input type="range" id = "synth_gap" min="0.1" max="2" step="0.1" value="0.5">
+                            <span class="value_readout" id = "synth_gap_value">0.5s</span>
                         </label>
-                        <label id = "scale_octaves_label" style="display: none">
-                            <span class="control_label">Octaves</span>
-                            <select id = "scale_octaves">
-                                <option value="1" selected>1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
+                    </div>
+                </div>
+                <div class="choice_holder">
+                    <div class="selection_title">synth tone</div>
+                    <div class="selection sound_settings">
+                        <label>
+                            <span class="control_label">Waveform</span>
+                            <select id = "synth_waveform">
+                                <option value="sine" selected>Sine</option>
+                                <option value="triangle">Triangle</option>
+                                <option value="sawtooth">Sawtooth</option>
+                                <option value="square">Square</option>
                             </select>
                         </label>
                         <label>
-                            <span class="control_label">Hands</span>
-                            <select id = "rhythm_hands">
-                                <option value="right" selected>Right</option>
-                                <option value="left">Left</option>
-                                <option value="both">Both</option>
-                            </select>
+                            <span class="control_label">Detune</span>
+                            <input type="range" id = "synth_detune" min="0" max="30" step="1" value="6">
+                            <span class="value_readout" id = "synth_detune_value">6&cent;</span>
                         </label>
-                        <label class="checkbox_label">
-                            <input type="checkbox" id = "rhythm_metronome" checked>
-                            <span class="control_label">Metronome</span>
+                        <label>
+                            <span class="control_label">Attack</span>
+                            <input type="range" id = "synth_attack" min="0" max="200" step="5" value="20">
+                            <span class="value_readout" id = "synth_attack_value">20ms</span>
                         </label>
-                    </div>
-                    <div id = "rhythm_source_label"></div>
-                    <div id = "rhythm_stage">
-                        <div id = "rhythm_score"></div>
-                        <div id = "rhythm_overlay">
-                            <div id = "rhythm_playhead" style="display: none"></div>
+                        <label>
+                            <span class="control_label">Release</span>
+                            <input type="range" id = "synth_release" min="10" max="400" step="10" value="80">
+                            <span class="value_readout" id = "synth_release_value">80ms</span>
+                        </label>
+                        <label>
+                            <span class="control_label">Volume</span>
+                            <input type="range" id = "synth_volume" min="0" max="50" step="1" value="16">
+                            <span class="value_readout" id = "synth_volume_value">16%</span>
+                        </label>
+                        <div class="sound_preview_buttons">
+                            <button id = "synth_preview_note">&#9658; note</button>
+                            <button id = "synth_preview_interval">&#9658; interval</button>
                         </div>
                     </div>
-                    <div id = "rhythm_feedback"></div>
                 </div>
-                <canvas id	= "visuals" style="display: none"></canvas>
-                <div id = "keyboard">
-                    <div id = "black_keys">
-                        <div id = "1"   class= "black" style="left: 10.04%;"></div>
-                        <div id = "3"   class= "black" style="left: 24.32%;"></div>
-                        <div id = "6"   class= "black" style="left: 52.89%;"></div>
-                        <div id = "8"   class= "black" style="left: 67.18%;"></div>
-                        <div id = "10"  class= "black" style="left: 81.46%;"></div>
+            </div>
+
+            <div id = "panel_controls" class="option_panel" style="display: none">
+                <div class="choice_holder">
+                    <div class="selection_title">keyboard controls</div>
+                    <div class="selection binding_list">
+                        <div class="binding_row" data-control="start_stop">
+                            <span class="binding_label">Start / stop a run</span>
+                            <span class="binding_key"></span>
+                            <button type="button">Set</button>
+                        </div>
+                        <div class="binding_row" data-control="replay">
+                            <span class="binding_label">Hear it again</span>
+                            <span class="binding_key"></span>
+                            <button type="button">Set</button>
+                        </div>
+                        <div class="binding_hint">Press Set, then play the key you want to use.</div>
                     </div>
-                    <div id = "white_keys">
-                        <div id = "0"   class= "white"><span class="key_label">C</span></div>
-                        <div id = "2"   class= "white"><span class="key_label">D</span></div>
-                        <div id = "4"   class= "white"><span class="key_label">E</span></div>
-                        <div id = "5"   class= "white"><span class="key_label">F</span></div>
-                        <div id = "7"   class= "white"><span class="key_label">G</span></div>
-                        <div id = "9"   class= "white"><span class="key_label">A</span></div>
-                        <div id = "11"  class= "white"><span class="key_label">B</span></div>
+                </div>
+            </div>
+
+            <div id = "panel_rhythm_notes" class="option_panel" style="display: none">
+                <div class="choice_holder">
+                    <div class="selection_title">note types</div>
+                    <div id = "rhythm_duration_selection" class="selection"></div>
+                </div>
+                <div class="choice_holder">
+                    <div class="selection_title">rests</div>
+                    <div id = "rhythm_rest_selection" class="selection"></div>
+                </div>
+                <div class="choice_holder">
+                    <div class="selection_title">ties</div>
+                    <div id = "rhythm_tie_selection" class="selection"></div>
+                </div>
+            </div>
+
+            <div id = "quiz_controls">
+                <button id = "replay_button" style="display: none">&#9834; REPLAY</button>
+            </div>
+            <pre id = "terminal">Select a topic to begin.</pre>
+            <div id = "notation" style="display: none">
+                <div id = "notation_score"></div>
+            </div>
+            <div id = "rhythm_panel" style="display: none">
+                <div id = "rhythm_controls">
+                    <button id = "rhythm_start">&#9658; START</button>
+                    <button id = "rhythm_new" title="Different passage">&#8635; NEW</button>
+                    <label>
+                        <span class="control_label">Tempo</span>
+                        <input type="range" id = "rhythm_tempo" min="40" max="160" step="5" value="80">
+                        <span class="value_readout" id = "rhythm_tempo_value">80 bpm</span>
+                    </label>
+                    <label>
+                        <span class="control_label">Rhythms</span>
+                        <select id = "rhythm_source">
+                            <option value="generated" selected>Generated</option>
+                            <option value="bach">Bach chorales</option>
+                            <!-- never a real choice here -- only the Patterns topic button
+                                 puts you into partimento mode, since that also has to set up
+                                 the pattern picker and pin Hands, neither of which picking
+                                 this from the dropdown would do. Present only so this select
+                                 can still show "Partimento patterns" as its (locked) value
+                                 while that topic is active -- see sync_generator_controls(). -->
+                            <option value="partimento" disabled>Partimento patterns</option>
+                            <!-- same story as Partimento patterns above -- only the Modes
+                                 topic button puts you into scale practice -->
+                            <option value="scales" disabled>Scale practice</option>
+                        </select>
+                    </label>
+                    <label id = "rhythm_measures_label">
+                        <span class="control_label">Measures</span>
+                        <select id = "rhythm_measures">
+                            <option value="2">2</option>
+                            <option value="4" selected>4</option>
+                            <option value="8">8</option>
+                            <option value="12">12</option>
+                            <option value="16">16</option>
+                        </select>
+                    </label>
+                    <label id = "scale_octaves_label" style="display: none">
+                        <span class="control_label">Octaves</span>
+                        <select id = "scale_octaves">
+                            <option value="1" selected>1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span class="control_label">Hands</span>
+                        <select id = "rhythm_hands">
+                            <option value="right" selected>Right</option>
+                            <option value="left">Left</option>
+                            <option value="both">Both</option>
+                        </select>
+                    </label>
+                    <label class="checkbox_label">
+                        <input type="checkbox" id = "rhythm_metronome" checked>
+                        <span class="control_label">Metronome</span>
+                    </label>
+                </div>
+                <div id = "rhythm_source_label"></div>
+                <div id = "rhythm_stage">
+                    <div id = "rhythm_score"></div>
+                    <div id = "rhythm_overlay">
+                        <div id = "rhythm_playhead" style="display: none"></div>
                     </div>
+                </div>
+                <div id = "rhythm_feedback"></div>
+            </div>
+            <canvas id	= "visuals" style="display: none"></canvas>
+            <div id = "keyboard">
+                <div id = "black_keys">
+                    <div id = "1"   class= "black" style="left: 10.04%;"></div>
+                    <div id = "3"   class= "black" style="left: 24.32%;"></div>
+                    <div id = "6"   class= "black" style="left: 52.89%;"></div>
+                    <div id = "8"   class= "black" style="left: 67.18%;"></div>
+                    <div id = "10"  class= "black" style="left: 81.46%;"></div>
+                </div>
+                <div id = "white_keys">
+                    <div id = "0"   class= "white"><span class="key_label">C</span></div>
+                    <div id = "2"   class= "white"><span class="key_label">D</span></div>
+                    <div id = "4"   class= "white"><span class="key_label">E</span></div>
+                    <div id = "5"   class= "white"><span class="key_label">F</span></div>
+                    <div id = "7"   class= "white"><span class="key_label">G</span></div>
+                    <div id = "9"   class= "white"><span class="key_label">A</span></div>
+                    <div id = "11"  class= "white"><span class="key_label">B</span></div>
                 </div>
             </div>
         </div>
@@ -286,6 +305,7 @@
     <script src = "notation.js"     ></script>
     <script src = "note_quiz.js"    ></script>
     <script src = "interval_quiz.js"></script>
+    <script src = "interval_ear_training.js"></script>
     <script src = "chord_quiz.js"   ></script>
     <script src = "scale_degrees.js"></script>
     <script src = "bach_corpus.js"  ></script>
@@ -293,7 +313,6 @@
     <script src = "partimento.js"   ></script>
     <script src = "scale_practice.js"></script>
     <script src = "buttons.js"      ></script>
-    <script src = "interval_ear_training.js"></script>
 
 </body>
 

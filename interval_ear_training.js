@@ -36,10 +36,10 @@ function EarInterval_callback(event){
 }
 
 function init_EarInterval(){
-    set_relevant_options(['notes', 'intervals']);
+    set_topic_ui('interval_ear', ['notes', 'intervals']);
     canvas.style.display = 'none';
     init_quiz(random_EarInterval, EarInterval_callback);
     replay_button.style.display = 'block'; // the only mode with something to replay
 }
 
-add_game_button('Listen & Identify', init_EarInterval, 'menu_intervals', 'clay');
+add_game_button('Hear intervals', init_EarInterval, 'menu_ear', 'ear');

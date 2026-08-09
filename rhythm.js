@@ -1482,11 +1482,11 @@ function stop_rhythm() { // handed to init_quiz so switching modes kills the run
 // shared by every topic button that draws into this panel. Most of them have nothing to
 // choose in the practice panel -- their settings live inline above the score -- but
 // partimento roots its patterns off the note pickers, so the sections are passed in.
-function init_rhythm_panel(sections = []) {
-    set_relevant_options(sections);
+function init_rhythm_panel(id, sections = []) {
+    set_topic_ui(id, sections); // calls set_relevant_options(sections) itself
     canvas.style.display = 'none';
     init_quiz(next_rhythm, rhythm_callback, stop_rhythm); // disables the note-types tab too; undone below
-    rhythm_note_types_tab.disabled = false; // only Rhythm/Melody have any use for it
+    rhythm_note_types_tab.disabled = false; // Rhythm/Melody/Partimento/Modes all use it
     show_display('rhythm');
     render_rhythm_score(); // re-render now the panel is visible and has a real width
 }
@@ -1498,7 +1498,7 @@ function init_rhythm() {
     if (partimento_mode() || scales_mode()) rhythm_settings.source = 'generated';
     document.getElementById('rhythm_source').value = rhythm_settings.source;
     sync_generator_controls();
-    init_rhythm_panel();
+    init_rhythm_panel('rhythm');
 }
 
 rhythm_start_button.addEventListener('pointerdown', () => {
@@ -1514,11 +1514,13 @@ document.getElementById('rhythm_new').addEventListener('pointerdown', () => {
 document.getElementById('rhythm_tempo').addEventListener('input', (e) => {
     rhythm_settings.tempo = parseInt(e.target.value, 10);
     document.getElementById('rhythm_tempo_value').textContent = `${rhythm_settings.tempo} bpm`;
+    update_scope_readout(); // Rhythm's bar readout is "N BARS · N BPM" -- see buttons.js
 });
 
 document.getElementById('rhythm_measures').addEventListener('change', (e) => {
     rhythm_settings.measures = parseInt(e.target.value, 10);
     next_rhythm();
+    update_scope_readout();
 });
 
 document.getElementById('rhythm_source').addEventListener('change', (e) => {
@@ -1650,8 +1652,8 @@ function init_melody() {
     rhythm_settings.melody = true;
     document.getElementById('rhythm_source').value = 'bach';
     sync_generator_controls();
-    init_rhythm_panel();
+    init_rhythm_panel('melody');
 }
 
-add_game_button('Rhythm', init_rhythm, 'menu_rhythm', 'teal');
-add_game_button('Melody', init_melody, 'menu_rhythm', 'teal');
+add_game_button('Rhythm', init_rhythm, 'menu_timing', 'timing');
+add_game_button('Melody', init_melody, 'menu_timing', 'timing');

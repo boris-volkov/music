@@ -16,9 +16,9 @@ function random_chord(){
 const chord_callback = make_chord_style_callback(() => chord_array, random_chord);
 
 function init_chord(){
-    set_relevant_options(['notes', 'chords']);
+    set_topic_ui('chords', ['notes', 'chords']);
     canvas.style.display = 'none';
     init_quiz(random_chord, chord_callback)
 }
 
-add_game_button('Chord Recognition', init_chord, 'menu_chords_scales', 'clay');
+add_game_button('Chords', init_chord, 'menu_ear', 'ear');

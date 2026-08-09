@@ -10,10 +10,10 @@ function init_quiz(starter, callback, cleanup = null){ // sending both funcs suc
     reset_display(); // clears any stale notation panel left over from a previous mode
     // only modes that play something for you get a replay button; they re-show it after
     document.getElementById('replay_button').style.display = 'none';
-    // the note-types tab only has anything to offer on the Rhythm/Melody topics -- default
-    // it closed and disabled on every switch, same as set_relevant_options() does for the
-    // Practice tab; init_rhythm_panel() (in rhythm.js) turns it back on when the switch is
-    // into one of those two
+    // the note-types tab only has anything to offer on the four topics built on the
+    // shared rhythm engine (Rhythm, Melody, Partimento, Modes) -- default it closed and
+    // disabled on every switch; init_rhythm_panel() (rhythm.js) turns it back on, and
+    // set_topic_ui() (buttons.js) shows or hides it, when the switch is into one of those
     const noteTypesTab = document.getElementById('rhythm_note_types_tab');
     if (noteTypesTab) {
         if (noteTypesTab.classList.contains('active')) optionsOff();
@@ -24,19 +24,28 @@ function init_quiz(starter, callback, cleanup = null){ // sending both funcs suc
     bindMidiInputs(); // safe even if midi isn't ready yet or no keyboard is plugged in
 }
 
-function add_game_button(name, func, panelId, colorClass){
+// One row in the left rail. `group` is one of the rail_group ids (reading/ear/theory/
+// timing/patterns) -- it's what colours the row's leading dot (see the .topic_button.*
+// rules in style.css), replacing the old cards' full-button fill now that a row has no
+// border or background of its own to carry colour in.
+function add_game_button(name, func, panelId, group){
   const button = document.createElement('button');
-  button.textContent = name;
-  button.classList.add('topic_button', colorClass);
+  button.classList.add('topic_button', group);
+  const dot = document.createElement('span');
+  dot.classList.add('topic_dot');
+  const label = document.createElement('span');
+  label.textContent = name;
+  button.append(dot, label);
   button.addEventListener('pointerdown', function () {
       func();
 
-      // deactivate all other buttons and activate this one
-      const others = document.querySelectorAll("#game_choices button");
+      // deactivate every other topic row and activate this one
+      const others = document.querySelectorAll('#rail .topic_button');
       others.forEach((b) => {
         b.classList.remove("active");
       });
-      this.classList.add("active");
+      button.classList.add("active");
+      document.getElementById('now_name').textContent = name;
       optionsOff();
 });
   const container = document.getElementById(panelId);

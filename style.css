@@ -18,6 +18,10 @@
 	--amber: #e8c468;
 	--amber-border: #d4ab4c;
 	--terracotta: #d97a6c;
+	/* rail/bar tokens -- see the design handoff's "Design tokens" section */
+	--label-soft: #a1937c;   /* small-caps labels at 9-10px, lighter than --ink-soft */
+	--rail-hover: #efe6d4;   /* rail row hover/active fill, and the bar tabs' hover fill */
+	--hairline: #e4d8c2;     /* the rule above the MIDI footer */
 }
 
 html, body {
@@ -52,152 +56,242 @@ canvas {
 	gap: 20px;
 }
 
-/* MIDI status indicator */
+/* Page shell: a narrow rail flush against the left edge, and everything else in a main
+   column beside it. Replaces the old #app_grid two-column grid -- the rail's width is
+   set by its content (172px, wide enough for a label and nothing more), not a fraction
+   of the page, which is what lets the staff and keyboard have the rest. */
 
-#midi_status {
-	margin-left: auto;
-	font-size: 16px;
-	font-weight: 700;
-	color: var(--line);
-	text-align: center;
-	transition: color 0.2s ease;
-	cursor: help;
-	padding: 4px 8px;
+#outer {
+	display: flex;
+	min-height: 100vh;
 }
 
-#midi_status.status-ok {
-	color: var(--teal-bright);
+/* Left rail */
+
+#rail {
+	width: 172px;
+	flex: 0 0 172px;
+	background: var(--panel);
+	border-right: 2px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	padding: 14px 0 12px 0;
 }
 
-#midi_status.status-warn {
-	color: var(--amber);
-}
-
-#midi_status.status-error {
-	color: var(--terracotta);
-}
-
-/* Layout grid */
-
-#app_grid {
-	display: grid;
-	grid-template-columns: 1fr 2fr;
-	gap: 24px;
-	max-width: 1400px;
-	margin: 0 auto;
-	width: 100%;
-	flex: 1;
-}
-
+/* below this, stack the rail above the main column rather than squeezing it to 172px --
+   comes after the rule above on purpose so the narrower width actually wins at this size */
 @media (max-width: 900px) {
-	#app_grid {
-		grid-template-columns: 1fr;
+	#outer {
+		flex-direction: column;
+	}
+
+	#rail {
+		width: 100%;
+		flex: 0 0 auto;
+		border-right: none;
+		border-bottom: 2px solid var(--line);
+		max-height: 50vh;
+		overflow-y: auto;
 	}
 }
 
-/* Left column */
-
-#left_column {
+#rail_title {
+	padding: 0 14px 12px 14px;
 	display: flex;
 	flex-direction: column;
-	gap: 20px;
+	gap: 1px;
 }
 
-#game_choices {
-	display: flex;
-	flex-direction: column;
-	gap: 20px;
+#rail_title_main {
+	font-size: 15px;
+	font-weight: 700;
+	letter-spacing: 0.01em;
 }
 
-.menu_panel {
-	background: var(--panel);
-	border: 2px solid var(--line);
-	border-radius: 8px;
-}
-
-.menu_panel_header {
-	padding: 12px 16px;
-	border-bottom: 2px solid var(--line);
+#rail_title_sub {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 9px;
 	font-weight: 600;
-	font-size: 12px;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--ink-soft);
+	letter-spacing: 0.14em;
+	color: var(--label-soft);
 }
 
-.menu_panel_body {
+.rail_group {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
-	padding: 12px;
+	padding-bottom: 10px;
 }
 
+.rail_group_label {
+	padding: 4px 14px;
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 9px;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--label-soft);
+}
+
+.rail_group_body {
+	display: flex;
+	flex-direction: column;
+}
+
+/* one row per topic (add_game_button in utility.js builds these) -- no border or fill of
+   its own, which is what lets the rail run this narrow; a leading dot carries the same
+   group colour the old cards used to fill the whole button with */
 .topic_button {
-	padding: 8px 12px;
-	border-radius: 5px;
-	font-size: 13px;
-	font-weight: 500;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	text-align: left;
+	padding: 6px 14px;
+	border: none;
+	border-left: 3px solid transparent;
+	background: transparent;
+	font-size: 12.5px;
+	font-weight: 400;
+	color: var(--ink);
 	cursor: pointer;
-	transition: background 0.15s;
+	transition: background 0.12s;
 }
 
-.topic_button.teal {
-	background: var(--teal);
-	border: 1px solid var(--teal-border);
-}
-
-.topic_button.teal:hover {
-	background: var(--teal-border);
-}
-
-.topic_button.clay {
-	background: var(--clay);
-	border: 1px solid var(--clay-border);
-}
-
-.topic_button.clay:hover {
-	background: var(--clay-border);
-}
-
-.topic_button.amber {
-	background: var(--amber);
-	border: 1px solid var(--amber-border);
-}
-
-.topic_button.amber:hover {
-	background: var(--amber-border);
+.topic_button:hover {
+	background: var(--rail-hover);
 }
 
 .topic_button.active {
-	background: var(--ink);
-	color: var(--canvas);
-	border-color: var(--ink);
+	border-left-color: var(--ink);
+	background: var(--rail-hover);
+	font-weight: 600;
 }
 
-/* Menu bar and the option panels it opens */
+.topic_dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	flex: 0 0 6px;
+	background: var(--dot-color, var(--line));
+}
+
+.topic_button.active .topic_dot {
+	background: var(--ink);
+}
+
+.topic_button.reading { --dot-color: var(--teal); }
+.topic_button.ear,
+.topic_button.theory { --dot-color: var(--clay); }
+.topic_button.timing { --dot-color: var(--amber); }
+.topic_button.patterns { --dot-color: var(--teal); }
+
+#rail_footer {
+	margin-top: auto;
+	padding: 10px 14px 0 14px;
+	border-top: 1px solid var(--hairline);
+	display: flex;
+	align-items: center;
+	gap: 7px;
+}
+
+/* MIDI status indicator -- a small dot rather than the page-level readout it used to be,
+   now that it lives in the rail footer next to its own "MIDI" label */
+
+#midi_status {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--line);
+	padding: 0;
+	transition: background 0.2s ease;
+	cursor: help;
+}
+
+#midi_status.status-ok {
+	background: var(--teal-bright);
+}
+
+#midi_status.status-warn {
+	background: var(--amber);
+}
+
+#midi_status.status-error {
+	background: var(--terracotta);
+}
+
+#rail_footer_label {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	color: var(--ink-soft);
+}
+
+/* Main column */
+
+#main_column {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	padding: 14px 20px 20px 20px;
+	gap: 14px;
+}
+
+/* Contextual option bar. Only the tabs the active topic actually uses are shown --
+   see set_topic_ui() in buttons.js -- rather than the full set sitting there disabled;
+   a permanently-present Notation button was what made it look like it belonged to every
+   game instead of just the one that reads it. */
 
 #menu_bar {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 10px;
 	flex-wrap: wrap;
+	padding-bottom: 12px;
+	border-bottom: 2px solid var(--line);
+}
+
+#now_block {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-right: 4px;
+}
+
+#now_tag {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	color: var(--label-soft);
+}
+
+#now_name {
+	font-size: 16px;
+	font-weight: 700;
+}
+
+#now_divider {
+	width: 1px;
+	height: 22px;
+	background: var(--line);
 }
 
 .menu_tab {
-	padding: 10px 16px;
+	padding: 7px 12px;
 	border-radius: 6px;
 	border: 2px solid var(--line);
 	background: var(--panel);
 	color: var(--ink);
 	font-weight: 600;
-	font-size: 13px;
-	letter-spacing: 0.04em;
+	font-size: 12px;
+	letter-spacing: 0.03em;
 	cursor: pointer;
-	transition: background 0.15s;
+	transition: background 0.12s;
 }
 
-.menu_tab:hover:not(:disabled) {
-	background: var(--line);
+.menu_tab:hover:not(:disabled):not(.active) {
+	background: var(--rail-hover);
 }
 
 .menu_tab.active {
@@ -211,8 +305,35 @@ canvas {
 	cursor: not-allowed;
 }
 
-#menu_bar #notation_toggle {
-	margin-left: auto; /* a display toggle, not an options panel -- sits apart */
+#bar_right {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+#scope_readout {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	color: var(--label-soft);
+	white-space: nowrap;
+}
+
+#full_screen {
+	padding: 7px 11px;
+	border-radius: 6px;
+	border: 2px solid var(--line);
+	background: var(--panel);
+	color: var(--ink-soft);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background 0.12s;
+}
+
+#full_screen:hover {
+	background: var(--rail-hover);
 }
 
 .option_panel {
@@ -220,19 +341,6 @@ canvas {
 	border: 2px solid var(--line);
 	border-radius: 8px;
 	padding: 16px;
-	flex-direction: column;
-	gap: 16px;
-}
-
-#practice_empty_note {
-	font-size: 13px;
-	color: var(--ink-soft);
-}
-
-/* Right column */
-
-#right_column {
-	display: flex;
 	flex-direction: column;
 	gap: 16px;
 }
