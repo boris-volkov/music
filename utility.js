@@ -4,12 +4,26 @@
 // function at init time. 
 let current_quiz_cleanup = null; // lets a mode stop timers/audio when the user switches away
 
+// The one Replay button belongs to whichever ear-training mode is open -- it used to be
+// wired straight to the interval trainer's own replay, which then sounded intervals from
+// inside the chord trainer. A mode hands over what should be heard again; init_quiz takes
+// it back on every switch, so a mode with nothing to replay never shows the button.
+let current_replay = null;
+
+function set_replay(fn){
+    current_replay = fn;
+    document.getElementById('replay_button').style.display = fn ? 'block' : 'none';
+}
+
+document.getElementById('replay_button').addEventListener('pointerdown', () => {
+    if (current_replay) current_replay();
+});
+
 function init_quiz(starter, callback, cleanup = null){ // sending both funcs sucks becuase the callback calls the starter anyway
     if (current_quiz_cleanup) current_quiz_cleanup();
     current_quiz_cleanup = cleanup;
     reset_display(); // clears any stale notation panel left over from a previous mode
-    // only modes that play something for you get a replay button; they re-show it after
-    document.getElementById('replay_button').style.display = 'none';
+    set_replay(null); // only modes that play something for you get it back, after this returns
     // the note-types tab only has anything to offer on the four topics built on the
     // shared rhythm engine (Rhythm, Melody, Partimento, Modes) -- default it closed and
     // disabled on every switch; init_rhythm_panel() (rhythm.js) turns it back on, and

@@ -496,6 +496,34 @@ pre#terminal {
 	min-height: 0;
 }
 
+/* pushed to the left end of the row so Replay stays where it always is, whether or not
+   a mode has controls of its own sitting next to it */
+#chord_ear_controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 16px;
+	margin-right: auto;
+}
+
+#chord_ear_controls label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: var(--ink);
+}
+
+#chord_ear_controls select {
+	padding: 4px 8px;
+	border-radius: 5px;
+	border: 1px solid var(--line);
+	background: var(--canvas);
+	color: var(--ink);
+	font-family: 'IBM Plex Sans', sans-serif;
+	font-size: 13px;
+}
+
 #replay_button {
 	padding: 8px 16px;
 	border-radius: 6px;

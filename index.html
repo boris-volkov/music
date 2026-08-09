@@ -197,6 +197,25 @@
             </div>
 
             <div id = "quiz_controls">
+                <!-- shown only while Hear chords is open, by init_EarChord() -- these are
+                     that mode's difficulty axes, not settings anything else can use -->
+                <div id = "chord_ear_controls" style="display: none">
+                    <label>
+                        <span class="control_label">Voicing</span>
+                        <select id = "chord_ear_voicing">
+                            <option value="blocked" selected>Blocked</option>
+                            <option value="up">Arpeggio up</option>
+                            <option value="down">Arpeggio down</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span class="control_label">Position</span>
+                        <select id = "chord_ear_inversion">
+                            <option value="root" selected>Root position</option>
+                            <option value="any">Any inversion</option>
+                        </select>
+                    </label>
+                </div>
                 <button id = "replay_button" style="display: none">&#9834; REPLAY</button>
             </div>
             <pre id = "terminal">Select a topic to begin.</pre>
@@ -307,6 +326,7 @@
     <script src = "interval_quiz.js"></script>
     <script src = "interval_ear_training.js"></script>
     <script src = "chord_quiz.js"   ></script>
+    <script src = "chord_ear_training.js"></script>
     <script src = "scale_degrees.js"></script>
     <script src = "bach_corpus.js"  ></script>
     <script src = "rhythm.js"       ></script>

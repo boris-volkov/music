@@ -2,9 +2,6 @@ let EarInterval_kind, EarInterval_notes, EarInterval_base = null;
 let EarInterval_array;
 let EarInterval_sounding = null; // the notes as actually played, kept for replaying them
 
-const replay_button = document.getElementById('replay_button');
-replay_button.addEventListener('pointerdown', replay_EarInterval);
-
 function random_EarInterval(){
     if ( (EarInterval_base = notes.get_random()) == null) return;
     if ( (EarInterval = intervals.get_random()) == null) return;
@@ -39,7 +36,7 @@ function init_EarInterval(){
     set_topic_ui('interval_ear', ['notes', 'intervals']);
     canvas.style.display = 'none';
     init_quiz(random_EarInterval, EarInterval_callback);
-    replay_button.style.display = 'block'; // the only mode with something to replay
+    set_replay(replay_EarInterval);
 }
 
 add_game_button('Hear intervals', init_EarInterval, 'menu_ear', 'ear');

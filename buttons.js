@@ -119,6 +119,7 @@ const TOPIC_UI = {
     notes:        { showNotation: true,  showNoteTypes: false, scope: () => CLEF_SCOPE[clef_setting] || '' },
     interval_ear: { showNotation: false, showNoteTypes: false, scope: () => summarize_active(intervals, 'INTERVALS') },
     chords:       { showNotation: false, showNoteTypes: false, scope: () => summarize_active(chords, 'CHORDS') },
+    chord_ear:    { showNotation: false, showNoteTypes: false, scope: () => summarize_active(chords, 'CHORDS') },
     intervals:    { showNotation: false, showNoteTypes: false, scope: () => summarize_active(intervals, 'INTERVALS') },
     degrees:      { showNotation: false, showNoteTypes: false, scope: () => summarize_active(scales, 'SCALES') },
     modes:        { showNotation: false, showNoteTypes: true,  scope: () => summarize_active(scales, 'MODES') },
