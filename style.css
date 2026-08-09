@@ -48,18 +48,14 @@ canvas {
 	max-width: 100%;
 }
 
-#outer {
-	display: flex;
-	flex-direction: column;
-	min-height: 100vh;
-	padding: 20px;
-	gap: 20px;
-}
-
 /* Page shell: a narrow rail flush against the left edge, and everything else in a main
    column beside it. Replaces the old #app_grid two-column grid -- the rail's width is
    set by its content (172px, wide enough for a label and nothing more), not a fraction
-   of the page, which is what lets the staff and keyboard have the rest. */
+   of the page, which is what lets the staff and keyboard have the rest. This used to
+   carry flex-direction: column plus its own padding/gap; both moved to #main_column
+   below (a leftover duplicate #outer rule kept setting them here too, after nothing
+   overrode them, which is what pinned the rail above the page instead of beside it).
+*/
 
 #outer {
 	display: flex;
@@ -76,23 +72,6 @@ canvas {
 	display: flex;
 	flex-direction: column;
 	padding: 14px 0 12px 0;
-}
-
-/* below this, stack the rail above the main column rather than squeezing it to 172px --
-   comes after the rule above on purpose so the narrower width actually wins at this size */
-@media (max-width: 900px) {
-	#outer {
-		flex-direction: column;
-	}
-
-	#rail {
-		width: 100%;
-		flex: 0 0 auto;
-		border-right: none;
-		border-bottom: 2px solid var(--line);
-		max-height: 50vh;
-		overflow-y: auto;
-	}
 }
 
 #rail_title {
