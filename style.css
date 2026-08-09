@@ -60,6 +60,10 @@ canvas {
 #outer {
 	display: flex;
 	min-height: 100vh;
+	max-width: 1400px; /* the old #app_grid's own cap -- past this, a wide monitor was
+	                       stretching the staff and keyboard rather than just giving them
+	                       more breathing room */
+	margin: 0 auto;
 }
 
 /* Left rail */
@@ -752,6 +756,11 @@ pre#terminal {
 div#keyboard {
 	position: relative;
 	width: 100%;
+	/* a real octave is much narrower relative to its height than filling a whole wide
+	   column would draw it -- this caps it a fair bit short of that, not all the way
+	   down to the real ratio, so it stays an easy click/tap target */
+	max-width: 680px;
+	margin: 0 auto;
 	background: var(--panel);
 	border: 2px solid var(--line);
 	border-radius: 8px;
