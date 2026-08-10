@@ -1664,14 +1664,18 @@ function sync_generator_controls() {
         input.disabled = !enabled;
         input.closest('label').classList.toggle('disabled', !enabled);
     };
-    // melody is always Bach, partimento is always partimento, scales is always scales --
-    // all three topics pin this rather than leave it a live choice, the same way Hands
-    // gets pinned below. Without this, picking a different source out from under one of
-    // them (or vice versa, since the dropdown's own "Partimento patterns"/"Scale
-    // practice" options are otherwise still reachable) would silently morph the game into
-    // a different one mid-round instead of switching topics properly through the buttons
-    // that actually set one up.
-    set_enabled('rhythm_source', !rhythm_settings.melody && !partimento_mode() && !scales_mode());
+    // partimento is always partimento, scales is always scales -- both pin this rather
+    // than leave it a live choice, the same way Hands gets pinned below. Without this,
+    // picking a different source out from under one of them (or vice versa, since the
+    // dropdown's own "Partimento patterns"/"Scale practice" options are otherwise still
+    // reachable) would silently morph the game into a different one mid-round instead of
+    // switching topics properly through the buttons that actually set one up -- neither
+    // topic's own passage function even looks at rhythm_settings.source, so changing it
+    // out from under them would just make the dropdown lie about what's actually playing.
+    // Melody used to get the same treatment when Bach was its only option, but now that
+    // Bach vs. folk is a real choice -- and one next_rhythm() dispatches on exactly like
+    // Rhythm mode does -- pinning it would only hide a choice worth leaving reachable.
+    set_enabled('rhythm_source', !partimento_mode() && !scales_mode());
     set_enabled('rhythm_hands', melodic() && !partimento_mode() && !folk_mode()); // see two_handed()
 
     // ...and while partimento is up the control is pinned to Both, not merely greyed:
