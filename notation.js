@@ -56,17 +56,21 @@ const STAVE_LINE_LETTERS = {
 // second column made it ambiguous which line a given letter actually named -- worse than
 // the crowding it fixed. This sits every letter right against its own line instead, in a
 // single column, at the largest font that still leaves the neighbors any daylight at all
-// (measured directly against rendered bounding boxes: 6pt already touches, 5pt clears by
-// ~6px) -- small, but unambiguous, which matters more here than being easy to read from
-// a distance.
-const LEGEND_FONT_SIZE = 5; // unscaled -- 12.5px on screen
+// (measured directly against rendered bounding boxes: 6pt already touches, 5.5pt clears) --
+// small, but unambiguous, which matters more here than being easy to read from a distance.
+// A serif face reads calmer beside hand-engraved-style clef and noteheads than the
+// bare-default Arial bold this used to be -- Georgia specifically because it's built for
+// legibility at small sizes rather than for print headlines, so it survives being shrunk
+// down this far.
+const LEGEND_FONT_SIZE = 5.5; // unscaled -- ~13.75px on screen
+const LEGEND_FONT_FAMILY = 'Georgia, "Times New Roman", serif';
 
 function draw_stave_legend(context, stave, clef) {
     const letters = STAVE_LINE_LETTERS[clef];
     if (!letters) return;
     const x = stave.getX() + stave.getWidth() + 6;
     context.save();
-    context.setFont('Arial', LEGEND_FONT_SIZE, 'bold');
+    context.setFont(LEGEND_FONT_FAMILY, LEGEND_FONT_SIZE, 'normal', 'italic');
     letters.forEach((letter, i) => {
         context.fillText(letter, x, stave.getYForLine(i) + 2); // +2: centers on the line itself
     });
