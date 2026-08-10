@@ -442,15 +442,14 @@ function finish_rhythm(measures, attribution = null, key = null, bass = null) {
 // A barline is still just a beat boundary underneath -- beat 0 of measure m+1 is the same
 // instant as beat 4 of measure m -- so the same case for a tie applies there too: a note
 // that already started off the beat can be tied across the barline into the next measure,
-// same as it could across any other beat. The one place this can't be offered is where
-// MEASURES_PER_LINE wraps to a new system: the two notes then sit on different lines of
-// the score, and a tie is a single curve between two notes on the same line -- there's no
-// sane way to draw one that arcs off the right edge of one system and back in on the left
-// edge of the next, so that particular boundary is left alone.
+// same as it could across any other beat. A barline that also wraps to a new system used
+// to be excluded here -- a tie is one curve between two notes, and those two sit on
+// different lines of the score. Engraving's own answer to that is two half-arcs, one off
+// each facing edge, which is what layout_system() now draws (see measure_ends_tied()), so
+// every barline is fair game and no boundary needs special-casing.
 function add_cross_measure_ties(measures) {
     if (!rhythm_settings.ties) return;
     for (let m = 0; m < measures.length - 1; m++) {
-        if ((m + 1) % MEASURES_PER_LINE === 0) continue; // system break -- can't draw this one
         const measure = measures[m];
         const last = measure[measure.length - 1];
         const next = measures[m + 1][0];
@@ -552,22 +551,16 @@ function shift_pitch_octave(pitch, shift) {
 }
 
 // A tie the corpus kept is a fact about the real piece, not something under this
-// excerpt's control the way a generated tie is -- generate_rhythm() simply never opens
-// one at a spot it can't draw, but bach_excerpt() below slices a *random* window out of
-// a longer run, so the same kept tie can land on the last measure of a rendered system
-// in one round and land safely mid-system in the next, purely by luck of the offset. Strip
-// it wherever this particular slice puts it somewhere layout_system() has no next note to
-// reach for: the last measure of a system (a tie can't arc from one system to the next --
-// see add_cross_measure_ties() in the generator for the same restriction), or the last
-// measure of the slice itself (there's no next measure in this excerpt at all).
+// excerpt's control the way a generated tie is -- generate_rhythm() simply never opens one
+// at a spot it can't draw, but bach_excerpt() below slices a *random* window out of a
+// longer run, so a kept tie can land on the very last measure of the slice, where there is
+// no next note anywhere in the passage to tie into. That one is stripped. A tie at a
+// system break needs no such treatment any more -- layout_system() draws that as two
+// half-arcs off the facing edges (see measure_ends_tied()).
 function guard_unsafe_ties(measures) {
-    measures.forEach((measure, i) => {
-        const last = measure[measure.length - 1];
-        if (!last || !last.tie) return;
-        const systemBreak = (i + 1) % MEASURES_PER_LINE === 0;
-        const lastOfSlice = i === measures.length - 1;
-        if (systemBreak || lastOfSlice) last.tie = false;
-    });
+    const lastMeasure = measures[measures.length - 1];
+    const lastNote = lastMeasure && lastMeasure[lastMeasure.length - 1];
+    if (lastNote && lastNote.tie) lastNote.tie = false;
 }
 
 // takes a contiguous window out of one real passage, rather than stitching together
@@ -824,6 +817,13 @@ function build_stave_ties(measure, notes) {
     return ties;
 }
 
+// whether a measure hands a tie on to whatever follows it -- only its last note can, since
+// a tie anywhere earlier is drawn within the measure by build_stave_ties() above
+function measure_ends_tied(measure) {
+    const last = measure && measure[measure.length - 1];
+    return !!(last && last.tie);
+}
+
 // walks one column's notes against whichever ottava run is already open (if any) for
 // this voice, closing it into a bracket descriptor the moment the shift changes and
 // opening a new one if the new value isn't 0. `state` is carried in from the caller and
@@ -961,10 +961,11 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
     let upperTopLineY = null, upperBottomLineY = null, lowerTopLineY = null, bottomLineY = null;
 
     // a note pending a tie into the next measure's first note, carried from one column to
-    // the next within this same system. It never needs to survive past the last column --
-    // add_cross_measure_ties() already refuses to tag a tie at a system break -- so there's
-    // nothing to hand back to render_rhythm_score() between one layout_system() call and
-    // the next; each system starts and ends this local to itself.
+    // the next within this same system. It still never needs to survive past the last
+    // column, even now that a tie may cross a system break: the two halves of one of those
+    // are drawn independently, each from the side that has a note on it (see the
+    // measure_ends_tied() checks below), so neither system has to know a note on the other
+    // one exists. Nothing is handed back to render_rhythm_score() between calls.
     let carryUpperTie = null;
     let carryLowerTie = null;
 
@@ -1045,6 +1046,34 @@ function layout_system(context, firstIndex, count, topY, leftMargin, usable, gra
         // column's first note is about to be, so by draw time both ends are in place
         if (carryUpperTie) ties.push(new VF.StaveTie({ first_note: carryUpperTie, last_note: upperNotes[0] }));
         if (carryLowerTie) ties.push(new VF.StaveTie({ first_note: carryLowerTie, last_note: lowerNotes[0] }));
+
+        // A tie across a system break has its two notes on different lines, so no single
+        // arc can join them. Engraving's answer is two half-ties -- one leaving the last
+        // note off the right edge, one arriving at the next line's first note from the
+        // left edge -- and VexFlow draws exactly that when a StaveTie is handed only one
+        // of its two notes, falling back to the stave's own tie start/end x for the
+        // missing end. Fourth-species counterpoint ties across *every* barline, so this is
+        // the difference between a suspension rendering and it silently coming apart into
+        // two separate notes at every fourth bar.
+        if (column === 0 && firstIndex > 0) {
+            if (measure_ends_tied(current_rhythm.measures[firstIndex - 1])) {
+                ties.push(new VF.StaveTie({ last_note: upperNotes[0] }));
+            }
+            if (lowerNotes && measure_ends_tied(current_rhythm.bass[firstIndex - 1])) {
+                ties.push(new VF.StaveTie({ last_note: lowerNotes[0] }));
+            }
+        }
+        // ...and the outgoing half, drawn only where a next measure actually exists to
+        // receive it -- a tie hanging off the final barline of the whole passage would be
+        // pointing at nothing (guard_unsafe_ties() strips those at the source too)
+        if (column === count - 1 && mi + 1 < current_rhythm.measures.length) {
+            if (measure_ends_tied(current_rhythm.measures[mi])) {
+                ties.push(new VF.StaveTie({ first_note: upperNotes[upperNotes.length - 1] }));
+            }
+            if (lowerNotes && measure_ends_tied(current_rhythm.bass[mi])) {
+                ties.push(new VF.StaveTie({ first_note: lowerNotes[lowerNotes.length - 1] }));
+            }
+        }
 
         // formatting both voices together is what keeps the hands aligned in time
         const formatter = new VF.Formatter();
