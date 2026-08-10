@@ -94,32 +94,41 @@ function real_corpus_mode() {
     return REAL_CORPUS_SOURCES.includes(rhythm_settings.source);
 }
 
+function bach_mode() {
+    return rhythm_settings.source === 'bach';
+}
+
 function folk_mode() {
     return rhythm_settings.source === 'folk';
 }
 
-// melodies only exist in a borrowed corpus, so melody mode implies a real passage. A
-// partimento pattern needs no such switch -- there is nothing in one to practise but the
-// notes, so it is always pitched. Scale practice is the same story as partimento.
+// melody mode implies a real, pitched passage regardless of which source supplies it --
+// a borrowed one (Bach, folk) or a generated random walk over a scale (see
+// generate_melody_passage()). A partimento pattern needs no such switch -- there is
+// nothing in one to practise but the notes, so it is always pitched. Scale practice is
+// the same story as partimento.
 function melodic() {
-    return partimento_mode() || scales_mode() || (rhythm_settings.melody && real_corpus_mode());
+    return partimento_mode() || scales_mode() || rhythm_settings.melody;
 }
 
-// the lower line is only worth showing when its pitches are being asked for. A partimento
-// pattern is a shape made by two hands against each other -- one hand of it is half an
-// exercise -- so it is two-handed by nature rather than by setting, and saying so here
-// rather than by forcing the setting means no route into the mode can miss it. Folk tunes
-// are one voice in the source itself -- there is no bass line to hand a second hand, so
-// this stays false for them regardless of what Hands last happened to be set to (see
-// sync_generator_controls(), which pins the control to Right while folk is selected).
+// the lower line is only worth showing when its pitches are being asked for, AND when
+// there is a real second voice to show -- which only Bach's four-part writing actually
+// has. A partimento pattern is a shape made by two hands against each other -- one hand
+// of it is half an exercise -- so it is two-handed by nature rather than by setting, and
+// saying so here rather than by forcing the setting means no route into the mode can miss
+// it. Folk tunes are one voice in the source; a generated melody is a single random walk
+// with no bass line invented to go under it -- so this stays false for both regardless of
+// what Hands last happened to be set to (see sync_generator_controls(), which pins the
+// control to Right whenever the active source has no second voice to offer).
 function two_handed() {
-    return partimento_mode() || (melodic() && !folk_mode() && rhythm_settings.hands === 'both');
+    return partimento_mode() || (melodic() && bach_mode() && rhythm_settings.hands === 'both');
 }
 
 // left hand alone: the lower voice becomes the one voice, read from a bass-clef staff.
-// Folk excluded for the same one-voice-in-the-source reason as two_handed() above.
+// Folk and generated excluded for the same one-voice-in-the-source reason as
+// two_handed() above.
 function left_only() {
-    return !partimento_mode() && melodic() && !folk_mode() && rhythm_settings.hands === 'left';
+    return !partimento_mode() && melodic() && bach_mode() && rhythm_settings.hands === 'left';
 }
 
 // how many beats the ACTUAL passage on screen runs, not what the Measures setting says --
@@ -634,6 +643,74 @@ function folk_excerpt() {
     if (region) parts.push(region);
     parts.push(bars);
     return finish_rhythm(measures, { title, detail: parts.join(' · ') }, key, null);
+}
+
+// A small, mostly-single-step hop through a scale's degrees -- leashed to within about an
+// octave either side of the start so a long passage can't wander into a ridiculous
+// register. Near either edge of the leash a step is pulled back toward the centre instead
+// of chosen freely, so the walk turns around rather than pinning against the wall.
+const MELODY_WALK_STEPS = [-2, -1, -1, -1, 1, 1, 1, 2]; // small steps far likelier than a leap
+const MELODY_WALK_LEASH = 6; // scale degrees either side of the start
+function next_walk_degree(fromDegree) {
+    const step = random_element(MELODY_WALK_STEPS);
+    if (fromDegree + step > MELODY_WALK_LEASH) return fromDegree - Math.abs(step);
+    if (fromDegree + step < -MELODY_WALK_LEASH) return fromDegree + Math.abs(step);
+    return fromDegree + step;
+}
+
+// "Generated" in melody mode, the way the interval/chord ear-training games' random draws
+// are generated -- no real piece behind it, just a random walk up and down a scale (small
+// steps, mostly by one degree), which is the honest, unglamorous warm-up case rather than
+// the destination (see PHILOSOPHY.md). Built from the same two pieces every other
+// generated or scale-shaped passage already uses: generate_rhythm_shape() for the rhythm,
+// exactly like the plain generator and Partimento; spell_scale_pitch() (scale_practice.js)
+// for correctly-spelled pitches, exactly what Modes already uses to walk a scale's degrees
+// -- the only actually new part here is that the walk is a few random small steps rather
+// than Modes' fixed up-then-down run. Single voice only, like folk -- there is no bass
+// line to invent under an improvised tune, so Hands is pinned to Right for this too (see
+// sync_generator_controls()).
+function generate_melody_passage() {
+    const scale = scales.get_random();
+    const root = notes.get_random();
+    if (!scale || !root) {
+        // scales.get_random()/notes.get_random() already popped the practice panel open
+        // and said so in the (hidden, while the rhythm panel is showing) terminal -- this
+        // is the same message repeated where the player is actually looking, same as
+        // scale_practice_passage() and partimento_passage() already do for this exact case
+        rhythm_feedback.textContent =
+            `no ${!scale ? 'scales' : 'root notes'} selected — pick at least one in the practice panel`;
+        rhythm_feedback.className = 'failed';
+        return null;
+    }
+
+    const tonic = tonic_from_note_name(root.name);
+    const preferFlats = root.name.includes('♭');
+    const steps = scale.notes;
+    // the same comfortable single-octave register scale practice starts its right hand at
+    const octaveShift = 4 - tonic.octave;
+
+    const rhythmMeasures = generate_rhythm_shape(rhythm_settings.measures);
+    let degree = 0;
+    let pitch = null;
+    let tiedFromPrev = false;
+    const measures = rhythmMeasures.map((measure) => measure.map((note) => {
+        if (note.rest) {
+            tiedFromPrev = false;
+            return { duration: note.duration, rest: true };
+        }
+        if (!tiedFromPrev) {
+            if (pitch !== null) degree = next_walk_degree(degree); // first note stays at degree 0
+            pitch = spell_scale_pitch(tonic, root, steps, degree, octaveShift, preferFlats);
+        }
+        tiedFromPrev = !!note.tie;
+        return { duration: note.duration, rest: false, pitch, tie: note.tie };
+    }));
+
+    // no key signature -- same reasoning as scale_practice_passage(): this scale might be
+    // minor, a mode, or something with no standard key signature at all, and a wrong or
+    // invented one is worse than every accidental just printing inline
+    const attribution = { title: 'Generated melody', detail: `${root.name} ${scale.name} · random walk` };
+    return finish_rhythm(measures, attribution, null, null);
 }
 
 // --- rendering ----------------------------------------------------------------
@@ -1489,6 +1566,14 @@ function next_rhythm() {
     }
     else if (rhythm_settings.source === 'bach') passage = bach_excerpt();
     else if (rhythm_settings.source === 'folk') passage = folk_excerpt();
+    else if (rhythm_settings.melody) {
+        // Generated, but with pitches asked for: the only source here with no real piece
+        // behind it at all, so -- same defensive story as partimento/scales above -- an
+        // empty scale or root pool has nothing to fall back to that would still be melody
+        // practice, not just a rhythm with extra steps.
+        passage = generate_melody_passage();
+        if (!passage) return; // it has already said which pool (scales/notes) was left empty
+    }
 
     let note = '';
     if (real_corpus_mode() && !passage) {
@@ -1673,23 +1758,36 @@ function sync_generator_controls() {
     // topic's own passage function even looks at rhythm_settings.source, so changing it
     // out from under them would just make the dropdown lie about what's actually playing.
     // Melody used to get the same treatment when Bach was its only option, but now that
-    // Bach vs. folk is a real choice -- and one next_rhythm() dispatches on exactly like
-    // Rhythm mode does -- pinning it would only hide a choice worth leaving reachable.
+    // Bach vs. folk vs. generated is a real choice -- and one next_rhythm() dispatches on
+    // exactly like Rhythm mode does -- pinning it would only hide a choice worth leaving
+    // reachable.
     set_enabled('rhythm_source', !partimento_mode() && !scales_mode());
-    set_enabled('rhythm_hands', melodic() && !partimento_mode() && !folk_mode()); // see two_handed()
+    set_enabled('rhythm_hands', melodic() && bach_mode()); // only Bach has a real second voice -- see two_handed()
 
-    // ...and while partimento is up the control is pinned to Both, not merely greyed:
-    // a disabled select still reading "Left" would be describing an exercise that is
-    // being played with two hands. The stored preference is left alone underneath, so
-    // melody and scale practice get their own choice back on the way out.
+    // ...and while partimento (or folk/generated melody) is up the control is pinned
+    // rather than merely greyed: a disabled select still reading "Left" would be
+    // describing an exercise that is being played with two hands, or (for folk/generated)
+    // a bass line that doesn't exist. The stored preference is left alone underneath, so
+    // Bach gets its own choice back the moment it's selected again.
     const hands = document.getElementById('rhythm_hands');
-    hands.value = partimento_mode() ? 'both' : folk_mode() ? 'right' : rhythm_settings.hands;
+    hands.value = partimento_mode() ? 'both' : melodic() && !bach_mode() ? 'right' : rhythm_settings.hands;
 
     // Measures doesn't mean anything for scale practice -- the octave count drives how
     // long the passage is instead -- so the two controls swap places rather than sit
     // side by side with one of them inert.
     document.getElementById('rhythm_measures_label').style.display = scales_mode() ? 'none' : 'flex';
     document.getElementById('scale_octaves_label').style.display = scales_mode() ? 'flex' : 'none';
+
+    // Melody's practice-panel needs are the one thing here that vary live rather than per
+    // topic -- a scale/root picker only means anything while Generated is actually
+    // drawing from one (generate_melody_passage()); Bach and folk bring their own material
+    // and have no use for it, same as Modes hides it whenever a topic has nothing for it
+    // to pick (set_relevant_options() in buttons.js, called directly rather than through
+    // set_topic_ui() since only this one section list needs to react to the source
+    // dropdown instead of being fixed for the whole time a topic is open).
+    if (rhythm_settings.melody && typeof set_relevant_options === 'function') {
+        set_relevant_options(rhythm_settings.source === 'generated' ? ['notes', 'scales'] : []);
+    }
 
     // Melody's scope readout names whichever source is actually active (see TOPIC_UI in
     // buttons.js) -- only this function sees every point the source can change (the
@@ -1715,8 +1813,12 @@ function init_melody() {
     if (!real_corpus_mode()) rhythm_settings.source = 'folk';
     rhythm_settings.melody = true;
     document.getElementById('rhythm_source').value = rhythm_settings.source;
-    sync_generator_controls();
+    // init_rhythm_panel() calls set_topic_ui('melody', []), which would otherwise stomp
+    // sync_generator_controls()'s own section-visibility fix (see its comment) back to
+    // empty if it ran second -- both run in the same tick, so there's nothing to see in
+    // between regardless of order, but this order is the one that leaves the right state.
     init_rhythm_panel('melody');
+    sync_generator_controls();
 }
 
 add_game_button('Rhythm', init_rhythm, 'menu_timing', 'timing');

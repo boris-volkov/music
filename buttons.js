@@ -125,7 +125,7 @@ const TOPIC_UI = {
     degrees:      { showNotation: false, showNoteTypes: false, scope: () => summarize_active(scales, 'SCALES') },
     modes:        { showNotation: false, showNoteTypes: true,  scope: () => summarize_active(scales, 'MODES') },
     rhythm:       { showNotation: false, showNoteTypes: true,  scope: () => `${rhythm_settings.measures} BARS · ${rhythm_settings.tempo} BPM` },
-    melody:       { showNotation: false, showNoteTypes: true,  scope: () => folk_mode() ? 'FOLK SONGS' : 'BACH CHORALES' },
+    melody:       { showNotation: false, showNoteTypes: true,  scope: () => folk_mode() ? 'FOLK SONGS' : bach_mode() ? 'BACH CHORALES' : summarize_active(scales, 'SCALES') },
     partimento:   { showNotation: false, showNoteTypes: true,  scope: () => summarize_active(partimento_types, 'PATTERNS') },
 };
 
