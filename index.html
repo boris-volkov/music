@@ -57,17 +57,23 @@
 
                 <!-- Notation, Practice and Note types are hidden by default and shown per
                      topic by set_topic_ui() (buttons.js) -- only the games that actually use
-                     them should ever show them. Audio and Keys apply everywhere, so they're
-                     always on. -->
+                     them should ever show them. -->
                 <button id = "notation_toggle" class="menu_tab" style="display: none" title="Toggle musical notation">Notation</button>
                 <button class="menu_tab" data-panel="panel_practice" style="display: none"></button>
                 <button id = "rhythm_note_types_tab" class="menu_tab" data-panel="panel_rhythm_notes" style="display: none" disabled>Note types</button>
-                <button class="menu_tab" data-panel="panel_audio">Audio</button>
-                <button class="menu_tab" data-panel="panel_controls">Keys</button>
 
                 <div id = "bar_right">
                     <span id = "scope_readout"></span>
-                    <button id = "full_screen" title="Toggle fullscreen">⛶</button>
+                    <div id = "bar_global_divider"></div>
+                    <!-- Audio, Hotkeys and Fullscreen aren't about the topic on screen --
+                         they apply everywhere, always on, so they get their own darker-toned
+                         group apart from the topic tabs to their left rather than reading as
+                         one more of them. -->
+                    <div id = "bar_global">
+                        <button class="menu_tab global_tab" data-panel="panel_audio">Audio</button>
+                        <button class="menu_tab global_tab" data-panel="panel_controls">Hotkeys</button>
+                        <button id = "full_screen" title="Toggle fullscreen">⛶</button>
+                    </div>
                 </div>
             </div>
 

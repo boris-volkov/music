@@ -22,6 +22,10 @@
 	--label-soft: #a1937c;   /* small-caps labels at 9-10px, lighter than --ink-soft */
 	--rail-hover: #efe6d4;   /* rail row hover/active fill, and the bar tabs' hover fill */
 	--hairline: #e4d8c2;     /* the rule above the MIDI footer */
+	--bar-global: #e2d5b8;   /* Audio/Hotkeys/Fullscreen -- a shade darker than --panel so the
+	                            program-wide controls read as a different kind of button from
+	                            the topic tabs beside them, not just another one */
+	--bar-global-hover: #d7c8a4;
 }
 
 html, body {
@@ -292,7 +296,7 @@ canvas {
 	margin-left: auto;
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 12px;
 }
 
 #scope_readout {
@@ -303,11 +307,37 @@ canvas {
 	white-space: nowrap;
 }
 
+/* separates the contextual scope readout from the program-wide controls beside it,
+   the same way #now_divider separates the NOW label from the topic tabs */
+#bar_global_divider {
+	width: 1px;
+	height: 22px;
+	background: var(--line);
+}
+
+#bar_global {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* Audio and Hotkeys are menu_tabs functionally (same open/close-a-panel behavior), but
+   sit on the darker --bar-global tone here rather than --panel, so the "always on,
+   applies everywhere" group reads as categorically different from the topic tabs to its
+   left at a glance, not just placed further away from them. */
+.global_tab {
+	background: var(--bar-global);
+}
+
+.global_tab:hover:not(.active) {
+	background: var(--bar-global-hover);
+}
+
 #full_screen {
 	padding: 7px 11px;
 	border-radius: 6px;
 	border: 2px solid var(--line);
-	background: var(--panel);
+	background: var(--bar-global);
 	color: var(--ink-soft);
 	font-size: 12px;
 	font-weight: 600;
@@ -316,7 +346,7 @@ canvas {
 }
 
 #full_screen:hover {
-	background: var(--rail-hover);
+	background: var(--bar-global-hover);
 }
 
 .option_panel {

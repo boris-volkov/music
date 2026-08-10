@@ -105,9 +105,10 @@ function set_relevant_options(sections) {
 //
 // Every topic calls set_topic_ui(id, sections) once, from its own init_*() function, in
 // place of the set_relevant_options() call it used to make directly (this calls that for
-// it). Bar tabs every topic wants regardless -- Audio, Keys -- are left alone in the HTML
-// rather than driven from here; only the ones that vary by topic (Notation, the Practice
-// tab via set_relevant_options above, Note types) are switched.
+// it). Bar tabs every topic wants regardless -- Audio, Hotkeys, Fullscreen, grouped
+// together on the right (#bar_global in index.html) -- are left alone in the HTML rather
+// than driven from here; only the ones that vary by topic (Notation, the Practice tab via
+// set_relevant_options above, Note types) are switched.
 //
 // Note types is on for four topics here, not the two ("Rhythm · Melody") the original
 // design handoff called for -- Partimento and Modes also generate their rhythm through
