@@ -111,24 +111,27 @@ function melodic() {
     return partimento_mode() || scales_mode() || rhythm_settings.melody;
 }
 
+// which sources actually offer a second voice for Hands' Left/Both options to mean
+// something -- Bach's real bass line, or (see generate_melody_passage()) a generated
+// melody doubled a third or sixth below in parallel, which is honest to build because
+// nothing real is being misrepresented by inventing it, unlike a fake bass under a real
+// folk tune would be. Folk stays one voice; there is no second line in the source to draw.
+function has_second_voice() {
+    return bach_mode() || (rhythm_settings.melody && rhythm_settings.source === 'generated');
+}
+
 // the lower line is only worth showing when its pitches are being asked for, AND when
-// there is a real second voice to show -- which only Bach's four-part writing actually
-// has. A partimento pattern is a shape made by two hands against each other -- one hand
-// of it is half an exercise -- so it is two-handed by nature rather than by setting, and
-// saying so here rather than by forcing the setting means no route into the mode can miss
-// it. Folk tunes are one voice in the source; a generated melody is a single random walk
-// with no bass line invented to go under it -- so this stays false for both regardless of
-// what Hands last happened to be set to (see sync_generator_controls(), which pins the
-// control to Right whenever the active source has no second voice to offer).
+// there is a second voice to show. A partimento pattern is a shape made by two hands
+// against each other -- one hand of it is half an exercise -- so it is two-handed by
+// nature rather than by setting, and saying so here rather than by forcing the setting
+// means no route into the mode can miss it.
 function two_handed() {
-    return partimento_mode() || (melodic() && bach_mode() && rhythm_settings.hands === 'both');
+    return partimento_mode() || (melodic() && has_second_voice() && rhythm_settings.hands === 'both');
 }
 
 // left hand alone: the lower voice becomes the one voice, read from a bass-clef staff.
-// Folk and generated excluded for the same one-voice-in-the-source reason as
-// two_handed() above.
 function left_only() {
-    return !partimento_mode() && melodic() && bach_mode() && rhythm_settings.hands === 'left';
+    return !partimento_mode() && melodic() && has_second_voice() && rhythm_settings.hands === 'left';
 }
 
 // how many beats the ACTUAL passage on screen runs, not what the Measures setting says --
@@ -658,17 +661,30 @@ function next_walk_degree(fromDegree) {
     return fromDegree + step;
 }
 
+// Interval the left hand doubles the walk at, when Hands offers a second voice for a
+// generated melody (see melody_interval select and has_second_voice()). Counted in scale
+// degrees, not fixed semitones -- a third spans 3 letter names (a 2-degree step down), a
+// sixth spans 6 (5 degrees) -- so the interval stays a genuine diatonic third or sixth the
+// whole way through (alternating major/minor by scale position, the way real parallel
+// thirds/sixths do) rather than a fixed transposition that could land outside the scale.
+const generated_melody_settings = { interval: 'third' };
+const MELODY_HARMONY_DEGREES = { third: -2, sixth: -5 };
+
+document.getElementById('melody_interval').addEventListener('change', (e) => {
+    generated_melody_settings.interval = e.target.value;
+    next_rhythm();
+});
+
 // "Generated" in melody mode, the way the interval/chord ear-training games' random draws
 // are generated -- no real piece behind it, just a random walk up and down a scale (small
 // steps, mostly by one degree), which is the honest, unglamorous warm-up case rather than
-// the destination (see PHILOSOPHY.md). Built from the same two pieces every other
-// generated or scale-shaped passage already uses: generate_rhythm_shape() for the rhythm,
-// exactly like the plain generator and Partimento; spell_scale_pitch() (scale_practice.js)
-// for correctly-spelled pitches, exactly what Modes already uses to walk a scale's degrees
-// -- the only actually new part here is that the walk is a few random small steps rather
-// than Modes' fixed up-then-down run. Single voice only, like folk -- there is no bass
-// line to invent under an improvised tune, so Hands is pinned to Right for this too (see
-// sync_generator_controls()).
+// the destination (see PHILOSOPHY.md). Built from pieces every other generated or scale-
+// shaped passage already uses: generate_rhythm_shape() for the rhythm, exactly like the
+// plain generator and Partimento; spell_scale_pitch() (scale_practice.js) for correctly-
+// spelled pitches and its own left-hand register, exactly what scale practice already uses
+// for its two hands -- the only actually new parts are the random walk in place of a fixed
+// up-then-down run, and the left hand tracking the walk at a fixed diatonic interval
+// instead of the same degree an octave down.
 function generate_melody_passage() {
     const scale = scales.get_random();
     const root = notes.get_random();
@@ -686,31 +702,52 @@ function generate_melody_passage() {
     const tonic = tonic_from_note_name(root.name);
     const preferFlats = root.name.includes('♭');
     const steps = scale.notes;
-    // the same comfortable single-octave register scale practice starts its right hand at
-    const octaveShift = 4 - tonic.octave;
+    // the same registers scale practice starts its two hands at -- a full octave apart,
+    // not just the interval below, so a hand playing "the interval below" doesn't collide
+    // with the other hand at the keyboard, and so it actually lands on the bass staff
+    // build_stave_notes() always draws the second voice on (see the "bassStave" rendering)
+    // instead of sitting in a pile of ledger lines above it
+    const upperShift = 4 - tonic.octave;
+    const lowerShift = 3 - tonic.octave;
+    const harmonyDegrees = MELODY_HARMONY_DEGREES[generated_melody_settings.interval];
 
     const rhythmMeasures = generate_rhythm_shape(rhythm_settings.measures);
     let degree = 0;
-    let pitch = null;
+    let upperPitch = null, lowerPitch = null;
     let tiedFromPrev = false;
-    const measures = rhythmMeasures.map((measure) => measure.map((note) => {
-        if (note.rest) {
-            tiedFromPrev = false;
-            return { duration: note.duration, rest: true };
-        }
-        if (!tiedFromPrev) {
-            if (pitch !== null) degree = next_walk_degree(degree); // first note stays at degree 0
-            pitch = spell_scale_pitch(tonic, root, steps, degree, octaveShift, preferFlats);
-        }
-        tiedFromPrev = !!note.tie;
-        return { duration: note.duration, rest: false, pitch, tie: note.tie };
-    }));
+    const upper = [], lower = [];
+    rhythmMeasures.forEach((measure) => {
+        const upperMeasure = [], lowerMeasure = [];
+        measure.forEach((note) => {
+            if (note.rest) {
+                upperMeasure.push({ duration: note.duration, rest: true });
+                lowerMeasure.push({ duration: note.duration, rest: true });
+            } else {
+                if (!tiedFromPrev) {
+                    if (upperPitch !== null) degree = next_walk_degree(degree); // first note stays at degree 0
+                    upperPitch = spell_scale_pitch(tonic, root, steps, degree, upperShift, preferFlats);
+                    lowerPitch = spell_scale_pitch(tonic, root, steps, degree + harmonyDegrees, lowerShift, preferFlats);
+                }
+                upperMeasure.push({ duration: note.duration, rest: false, pitch: upperPitch, tie: note.tie });
+                lowerMeasure.push({ duration: note.duration, rest: false, pitch: lowerPitch, tie: note.tie });
+            }
+            tiedFromPrev = !!note.tie;
+        });
+        upper.push(upperMeasure);
+        lower.push(lowerMeasure);
+    });
+
+    // left hand alone practises the harmony line on its own, so it becomes the only voice
+    const primary = left_only() ? lower : upper;
+    const bass = two_handed() ? lower : null;
 
     // no key signature -- same reasoning as scale_practice_passage(): this scale might be
     // minor, a mode, or something with no standard key signature at all, and a wrong or
     // invented one is worse than every accidental just printing inline
-    const attribution = { title: 'Generated melody', detail: `${root.name} ${scale.name} · random walk` };
-    return finish_rhythm(measures, attribution, null, null);
+    const detail = bass || left_only()
+        ? `${root.name} ${scale.name} · random walk in parallel ${generated_melody_settings.interval}s`
+        : `${root.name} ${scale.name} · random walk`;
+    return finish_rhythm(primary, { title: 'Generated melody', detail }, null, bass);
 }
 
 // --- rendering ----------------------------------------------------------------
@@ -1762,21 +1799,28 @@ function sync_generator_controls() {
     // exactly like Rhythm mode does -- pinning it would only hide a choice worth leaving
     // reachable.
     set_enabled('rhythm_source', !partimento_mode() && !scales_mode());
-    set_enabled('rhythm_hands', melodic() && bach_mode()); // only Bach has a real second voice -- see two_handed()
+    set_enabled('rhythm_hands', melodic() && has_second_voice()); // see two_handed()
 
-    // ...and while partimento (or folk/generated melody) is up the control is pinned
-    // rather than merely greyed: a disabled select still reading "Left" would be
-    // describing an exercise that is being played with two hands, or (for folk/generated)
-    // a bass line that doesn't exist. The stored preference is left alone underneath, so
-    // Bach gets its own choice back the moment it's selected again.
+    // ...and while partimento (or folk, which has no second voice at all) is up the
+    // control is pinned rather than merely greyed: a disabled select still reading "Left"
+    // would be describing an exercise that is being played with two hands, or a bass line
+    // that doesn't exist. The stored preference is left alone underneath, so Bach and
+    // generated melody get their own choice back the moment either is selected again.
     const hands = document.getElementById('rhythm_hands');
-    hands.value = partimento_mode() ? 'both' : melodic() && !bach_mode() ? 'right' : rhythm_settings.hands;
+    hands.value = partimento_mode() ? 'both' : melodic() && !has_second_voice() ? 'right' : rhythm_settings.hands;
 
     // Measures doesn't mean anything for scale practice -- the octave count drives how
     // long the passage is instead -- so the two controls swap places rather than sit
     // side by side with one of them inert.
     document.getElementById('rhythm_measures_label').style.display = scales_mode() ? 'none' : 'flex';
     document.getElementById('scale_octaves_label').style.display = scales_mode() ? 'flex' : 'none';
+
+    // Interval only means anything for a generated melody -- Bach's second voice is
+    // whatever the chorale actually wrote, not a choice, and folk has no second voice at
+    // all. Shown whenever generated melody is the active source, not just while Hands is
+    // actually set to Left/Both, so it doesn't wink in and out as Hands gets toggled.
+    document.getElementById('melody_interval_label').style.display =
+        rhythm_settings.melody && rhythm_settings.source === 'generated' ? 'flex' : 'none';
 
     // Melody's practice-panel needs are the one thing here that vary live rather than per
     // topic -- a scale/root picker only means anything while Generated is actually

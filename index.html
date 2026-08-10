@@ -281,6 +281,16 @@
                             <option value="both">Both</option>
                         </select>
                     </label>
+                    <!-- only means anything for a generated melody -- Bach's second voice is
+                         whatever the chorale actually wrote, not a choice; shown/hidden by
+                         sync_generator_controls() the same way Octaves swaps in for Measures -->
+                    <label id = "melody_interval_label" style="display: none">
+                        <span class="control_label">Interval</span>
+                        <select id = "melody_interval">
+                            <option value="third" selected>Third</option>
+                            <option value="sixth">Sixth</option>
+                        </select>
+                    </label>
                     <label class="checkbox_label">
                         <input type="checkbox" id = "rhythm_metronome" checked>
                         <span class="control_label">Metronome</span>
