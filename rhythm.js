@@ -85,6 +85,10 @@ function scales_mode() {
     return rhythm_settings.source === 'scales';
 }
 
+function counterpoint_mode() {
+    return rhythm_settings.source === 'counterpoint';
+}
+
 // sources backed by an actual piece of music rather than something generated -- Bach's
 // four-part chorales and (see folk_corpus.js) the Essen Folksong Collection's children's
 // songs. Kept as a list rather than two separate checks so a third one only has to be
@@ -108,7 +112,7 @@ function folk_mode() {
 // nothing in one to practise but the notes, so it is always pitched. Scale practice is
 // the same story as partimento.
 function melodic() {
-    return partimento_mode() || scales_mode() || rhythm_settings.melody;
+    return partimento_mode() || scales_mode() || counterpoint_mode() || rhythm_settings.melody;
 }
 
 // which sources actually offer a second voice for Hands' Left/Both options to mean
@@ -126,12 +130,14 @@ function has_second_voice() {
 // nature rather than by setting, and saying so here rather than by forcing the setting
 // means no route into the mode can miss it.
 function two_handed() {
-    return partimento_mode() || (melodic() && has_second_voice() && rhythm_settings.hands === 'both');
+    return partimento_mode() || counterpoint_mode()
+        || (melodic() && has_second_voice() && rhythm_settings.hands === 'both');
 }
 
 // left hand alone: the lower voice becomes the one voice, read from a bass-clef staff.
 function left_only() {
-    return !partimento_mode() && melodic() && has_second_voice() && rhythm_settings.hands === 'left';
+    return !partimento_mode() && !counterpoint_mode()
+        && melodic() && has_second_voice() && rhythm_settings.hands === 'left';
 }
 
 // how many beats the ACTUAL passage on screen runs, not what the Measures setting says --
@@ -1630,6 +1636,26 @@ function next_rhythm() {
         passage = scale_practice_passage();
         if (!passage) return; // it has already said which pool was left empty
     }
+    else if (counterpoint_mode()) {
+        // same defensive story as partimento/scales above -- a stale or missing
+        // counterpoint.js would otherwise fall through to the generator, and picking the
+        // topic would look like it had simply done nothing
+        if (typeof counterpoint_passage !== 'function') {
+            rhythm_feedback.textContent = 'counterpoint failed to load — reload the page';
+            rhythm_feedback.className = 'failed';
+            return;
+        }
+        passage = counterpoint_passage();
+        if (!passage) {
+            // the search gave up rather than returning a line that breaks the rules -- say
+            // so plainly, since a silently generated rhythm here would be the one thing
+            // this topic must never hand back
+            rhythm_feedback.textContent =
+                'no counterpoint found for that cantus and species — press NEW to try again';
+            rhythm_feedback.className = 'failed';
+            return;
+        }
+    }
     else if (rhythm_settings.source === 'bach') passage = bach_excerpt();
     else if (rhythm_settings.source === 'folk') passage = folk_excerpt();
     else if (rhythm_settings.melody) {
@@ -1693,9 +1719,11 @@ function init_rhythm_panel(id, sections = []) {
 
 function init_rhythm() {
     rhythm_settings.melody = false; // this topic is timing only, whatever the source
-    // a partimento pattern or a scale is nothing but pitches, so neither can be left as
-    // the source of a timing-only round -- fall back to the generator
-    if (partimento_mode() || scales_mode()) rhythm_settings.source = 'generated';
+    // a partimento pattern, a scale or a counterpoint exercise is nothing but pitches, so
+    // none of them can be left as the source of a timing-only round -- fall back to the
+    // generator. Leaving one in place would also strand the Source dropdown disabled, since
+    // all three pin it, and Rhythm would have no way back to a source it can actually use.
+    if (partimento_mode() || scales_mode() || counterpoint_mode()) rhythm_settings.source = 'generated';
     document.getElementById('rhythm_source').value = rhythm_settings.source;
     sync_generator_controls();
     init_rhythm_panel('rhythm');
@@ -1827,8 +1855,8 @@ function sync_generator_controls() {
     // Bach vs. folk vs. generated is a real choice -- and one next_rhythm() dispatches on
     // exactly like Rhythm mode does -- pinning it would only hide a choice worth leaving
     // reachable.
-    set_enabled('rhythm_source', !partimento_mode() && !scales_mode());
-    set_enabled('rhythm_hands', melodic() && has_second_voice()); // see two_handed()
+    set_enabled('rhythm_source', !partimento_mode() && !scales_mode() && !counterpoint_mode());
+    set_enabled('rhythm_hands', melodic() && has_second_voice() && !counterpoint_mode()); // see two_handed()
 
     // ...and while partimento (or folk, which has no second voice at all) is up the
     // control is pinned rather than merely greyed: a disabled select still reading "Left"
@@ -1836,13 +1864,18 @@ function sync_generator_controls() {
     // that doesn't exist. The stored preference is left alone underneath, so Bach and
     // generated melody get their own choice back the moment either is selected again.
     const hands = document.getElementById('rhythm_hands');
-    hands.value = partimento_mode() ? 'both' : melodic() && !has_second_voice() ? 'right' : rhythm_settings.hands;
+    hands.value = partimento_mode() || counterpoint_mode() ? 'both'
+        : melodic() && !has_second_voice() ? 'right' : rhythm_settings.hands;
 
     // Measures doesn't mean anything for scale practice -- the octave count drives how
     // long the passage is instead -- so the two controls swap places rather than sit
-    // side by side with one of them inert.
-    document.getElementById('rhythm_measures_label').style.display = scales_mode() ? 'none' : 'flex';
+    // side by side with one of them inert. Counterpoint hides it for the same reason:
+    // the cantus firmus is as long as Fux wrote it, and nothing may pad or truncate it.
+    document.getElementById('rhythm_measures_label').style.display =
+        scales_mode() || counterpoint_mode() ? 'none' : 'flex';
     document.getElementById('scale_octaves_label').style.display = scales_mode() ? 'flex' : 'none';
+    document.getElementById('counterpoint_species_label').style.display = counterpoint_mode() ? 'flex' : 'none';
+    document.getElementById('counterpoint_position_label').style.display = counterpoint_mode() ? 'flex' : 'none';
 
     // Interval only means anything for a generated melody -- Bach's second voice is
     // whatever the chorale actually wrote, not a choice, and folk has no second voice at

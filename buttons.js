@@ -127,6 +127,9 @@ const TOPIC_UI = {
     rhythm:       { showNotation: false, showNoteTypes: true,  scope: () => `${rhythm_settings.measures} BARS · ${rhythm_settings.tempo} BPM` },
     melody:       { showNotation: false, showNoteTypes: true,  scope: () => folk_mode() ? 'FOLK SONGS' : bach_mode() ? 'BACH CHORALES' : summarize_active(scales, 'SCALES') },
     partimento:   { showNotation: false, showNoteTypes: true,  scope: () => summarize_active(partimento_types, 'PATTERNS') },
+    // no Note types: a species *is* its rhythm, so there is nothing here for that panel to
+    // choose without contradicting the exercise
+    counterpoint: { showNotation: false, showNoteTypes: false, scope: () => `SPECIES ${counterpoint_settings.species} · FUX` },
 };
 
 const CLEF_SCOPE = { treble: 'TREBLE', bass: 'BASS', both: 'TREBLE + BASS' };

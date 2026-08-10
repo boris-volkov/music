@@ -253,6 +253,9 @@
                             <!-- same story as Partimento patterns above -- only the Modes
                                  topic button puts you into scale practice -->
                             <option value="scales" disabled>Scale practice</option>
+                            <!-- and again for Counterpoint, which has its own species and
+                                 position pickers to set up -->
+                            <option value="counterpoint" disabled>Fux counterpoint</option>
                         </select>
                     </label>
                     <label id = "rhythm_measures_label">
@@ -289,6 +292,24 @@
                         <select id = "melody_interval">
                             <option value="third" selected>Third</option>
                             <option value="sixth">Sixth</option>
+                        </select>
+                    </label>
+                    <!-- Fux's five species, in his own order of difficulty -->
+                    <label id = "counterpoint_species_label" style="display: none">
+                        <span class="control_label">Species</span>
+                        <select id = "counterpoint_species">
+                            <option value="1" selected>First — 1:1</option>
+                            <option value="2">Second — 2:1</option>
+                            <option value="3">Third — 4:1</option>
+                            <option value="4">Fourth — syncopated</option>
+                            <option value="5">Fifth — florid</option>
+                        </select>
+                    </label>
+                    <label id = "counterpoint_position_label" style="display: none">
+                        <span class="control_label">Counterpoint</span>
+                        <select id = "counterpoint_position">
+                            <option value="above" selected>Above</option>
+                            <option value="below">Below</option>
                         </select>
                     </label>
                     <label class="checkbox_label">
@@ -349,6 +370,7 @@
     <script src = "folk_corpus.js"  ></script>
     <script src = "rhythm.js"       ></script>
     <script src = "partimento.js"   ></script>
+    <script src = "counterpoint.js" ></script>
     <script src = "scale_practice.js"></script>
     <script src = "buttons.js"      ></script>
 
