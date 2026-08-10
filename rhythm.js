@@ -61,7 +61,7 @@ const OTTAVA_BRACKET_CLEARANCE = 24;
 const rhythm_settings = {
     tempo: 80,
     measures: 4,
-    source: 'generated', // 'generated' | 'bach' | 'partimento'
+    source: 'generated', // 'generated' | 'bach' | 'folk' | 'partimento'
     melody: false,       // also require the written pitch, not just the timing
     hands: 'right',      // 'right' | 'left' | 'both' -- 'both' adds the lower voice
     // which duration codes generate_measure() is allowed to place -- see DURATION_TYPES for
@@ -85,24 +85,41 @@ function scales_mode() {
     return rhythm_settings.source === 'scales';
 }
 
-// melodies only exist in the borrowed corpus, so melody mode implies a real passage. A
+// sources backed by an actual piece of music rather than something generated -- Bach's
+// four-part chorales and (see folk_corpus.js) the Essen Folksong Collection's children's
+// songs. Kept as a list rather than two separate checks so a third one only has to be
+// added here, not everywhere melodic()/two_handed()/etc. below currently spell out 'bach'.
+const REAL_CORPUS_SOURCES = ['bach', 'folk'];
+function real_corpus_mode() {
+    return REAL_CORPUS_SOURCES.includes(rhythm_settings.source);
+}
+
+function folk_mode() {
+    return rhythm_settings.source === 'folk';
+}
+
+// melodies only exist in a borrowed corpus, so melody mode implies a real passage. A
 // partimento pattern needs no such switch -- there is nothing in one to practise but the
 // notes, so it is always pitched. Scale practice is the same story as partimento.
 function melodic() {
-    return partimento_mode() || scales_mode() || (rhythm_settings.melody && rhythm_settings.source === 'bach');
+    return partimento_mode() || scales_mode() || (rhythm_settings.melody && real_corpus_mode());
 }
 
 // the lower line is only worth showing when its pitches are being asked for. A partimento
 // pattern is a shape made by two hands against each other -- one hand of it is half an
 // exercise -- so it is two-handed by nature rather than by setting, and saying so here
-// rather than by forcing the setting means no route into the mode can miss it.
+// rather than by forcing the setting means no route into the mode can miss it. Folk tunes
+// are one voice in the source itself -- there is no bass line to hand a second hand, so
+// this stays false for them regardless of what Hands last happened to be set to (see
+// sync_generator_controls(), which pins the control to Right while folk is selected).
 function two_handed() {
-    return partimento_mode() || (melodic() && rhythm_settings.hands === 'both');
+    return partimento_mode() || (melodic() && !folk_mode() && rhythm_settings.hands === 'both');
 }
 
-// left hand alone: the lower voice becomes the one voice, read from a bass-clef staff
+// left hand alone: the lower voice becomes the one voice, read from a bass-clef staff.
+// Folk excluded for the same one-voice-in-the-source reason as two_handed() above.
 function left_only() {
-    return !partimento_mode() && melodic() && rhythm_settings.hands === 'left';
+    return !partimento_mode() && melodic() && !folk_mode() && rhythm_settings.hands === 'left';
 }
 
 // how many beats the ACTUAL passage on screen runs, not what the Measures setting says --
@@ -587,6 +604,36 @@ function bach_excerpt() {
     const voice = bass ? 'soprano & bass' : left_only() ? 'bass' : 'soprano';
     parts.push(`${bars}, ${voice}`);
     return finish_rhythm(measures, { title, detail: parts.join(' · ') }, key, bass);
+}
+
+// same idea as bach_excerpt() -- a contiguous window out of one real tune -- but the
+// source (see folk_corpus.js) is monophonic, so there is only ever one voice to read and
+// no bass to hand a second hand. sync_generator_controls() pins Hands to Right while this
+// source is active, so left_only()/two_handed() never come into play here at all.
+function folk_excerpt() {
+    const wanted = rhythm_settings.measures;
+    const allowed = new Set([...enabled_durations(), ...enabled_rest_durations()]);
+    const candidates = FOLK_EXCERPTS.filter((e) =>
+        e.m.length >= wanted
+        && e.vocab.every((code) => allowed.has(code))
+        && (rhythm_settings.ties || !e.ties)
+    );
+    if (candidates.length === 0) return null;
+
+    const excerpt = random_element(candidates);
+    const offset = Math.floor(Math.random() * (excerpt.m.length - wanted + 1));
+    const measures = excerpt.m
+        .slice(offset, offset + wanted)
+        .map((mi) => FOLK_MEASURES[mi].map((ni) => parse_note(FOLK_NOTES[ni])));
+    guard_unsafe_ties(measures);
+
+    const [region, title, key] = FOLK_PIECES[excerpt.p];
+    const first = offset + 1;
+    const bars = wanted === 1 ? `m. ${first}` : `mm. ${first}–${first + wanted - 1}`;
+    const parts = ['German folk song'];
+    if (region) parts.push(region);
+    parts.push(bars);
+    return finish_rhythm(measures, { title, detail: parts.join(' · ') }, key, null);
 }
 
 // --- rendering ----------------------------------------------------------------
@@ -1441,12 +1488,14 @@ function next_rhythm() {
         if (!passage) return; // it has already said which pool was left empty
     }
     else if (rhythm_settings.source === 'bach') passage = bach_excerpt();
+    else if (rhythm_settings.source === 'folk') passage = folk_excerpt();
 
     let note = '';
-    if (rhythm_settings.source === 'bach' && !passage) {
+    if (real_corpus_mode() && !passage) {
         // either no real passage runs that long, or none of the ones that do fit the
         // enabled note types -- say so rather than silently generating one
-        note = ' (no matching chorale passage — generated instead)';
+        const label = { bach: 'chorale', folk: 'folk song' }[rhythm_settings.source];
+        note = ` (no matching ${label} passage — generated instead)`;
     }
     current_rhythm = passage || generate_rhythm();
 
@@ -1623,20 +1672,29 @@ function sync_generator_controls() {
     // a different one mid-round instead of switching topics properly through the buttons
     // that actually set one up.
     set_enabled('rhythm_source', !rhythm_settings.melody && !partimento_mode() && !scales_mode());
-    set_enabled('rhythm_hands', melodic() && !partimento_mode()); // see two_handed()
+    set_enabled('rhythm_hands', melodic() && !partimento_mode() && !folk_mode()); // see two_handed()
 
     // ...and while partimento is up the control is pinned to Both, not merely greyed:
     // a disabled select still reading "Left" would be describing an exercise that is
     // being played with two hands. The stored preference is left alone underneath, so
     // melody and scale practice get their own choice back on the way out.
     const hands = document.getElementById('rhythm_hands');
-    hands.value = partimento_mode() ? 'both' : rhythm_settings.hands;
+    hands.value = partimento_mode() ? 'both' : folk_mode() ? 'right' : rhythm_settings.hands;
 
     // Measures doesn't mean anything for scale practice -- the octave count drives how
     // long the passage is instead -- so the two controls swap places rather than sit
     // side by side with one of them inert.
     document.getElementById('rhythm_measures_label').style.display = scales_mode() ? 'none' : 'flex';
     document.getElementById('scale_octaves_label').style.display = scales_mode() ? 'flex' : 'none';
+
+    // Melody's scope readout names whichever source is actually active (see TOPIC_UI in
+    // buttons.js) -- only this function sees every point the source can change (the
+    // dropdown, and each topic's own init_*()), so it's the one place that can keep it
+    // live without repeating the call at each of those sites individually. buttons.js
+    // loads after this file, so the unconditional call below (line ~1697) would otherwise
+    // throw before it's ever defined -- same load-order hazard the partimento/scale-
+    // practice checks elsewhere in this file already guard against.
+    if (typeof update_scope_readout === 'function') update_scope_readout();
 }
 sync_generator_controls();
 
@@ -1648,9 +1706,11 @@ document.getElementById('rhythm_metronome').addEventListener('change', (e) => {
 // it's discoverable alongside the other practice modes, but the panel and its controls
 // are shared -- either button leaves you free to flip Pitches on or off from there.
 function init_melody() {
-    rhythm_settings.source = 'bach'; // the only corpus carrying pitches
+    // folk is the gentler on-ramp -- default there the first time in, but leave a source
+    // already chosen (Bach or folk) alone rather than resetting it every time this opens
+    if (!real_corpus_mode()) rhythm_settings.source = 'folk';
     rhythm_settings.melody = true;
-    document.getElementById('rhythm_source').value = 'bach';
+    document.getElementById('rhythm_source').value = rhythm_settings.source;
     sync_generator_controls();
     init_rhythm_panel('melody');
 }
