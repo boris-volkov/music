@@ -103,6 +103,13 @@ function cp_is_step(a, b) {
     return Math.abs(a.di - b.di) === 1;
 }
 
+// the span a single direction of travel traced out, judged as an interval in its own right:
+// a tritone or a seventh between the turning points is the one Fux singles out
+function cp_outlines_badly(from, to) {
+    const span = Math.abs(cp_midi(to) - cp_midi(from));
+    return span === 6 || span === 10 || span === 11;
+}
+
 // --- the species skeletons ----------------------------------------------------------
 //
 // Each species is a fixed rhythmic shape against the cantus, and the shape is most of what
@@ -227,8 +234,11 @@ function cp_search(cantus, skeleton, above, finalDi, opts) {
 
     const cantusAt = (beat) => cantus[Math.floor(beat / 4)];
     const chosen = [];
-    const runs = []; // parallel thirds/sixths in a row ending at each decision
+    const runs = [];     // parallel thirds/sixths in a row ending at each decision
+    const runStart = []; // where the current unbroken direction of travel began
+    const runLeapt = []; // ...and whether anything in it moved by more than a step
     let nodes = 0;
+    let aborted = false; // set once the clock runs out, and never unset -- see recurse()
 
     // whether a note that comes out dissonant is nevertheless allowed to stand there
     function dissonance_licensed(k, slot) {
@@ -315,6 +325,28 @@ function cp_search(cantus, skeleton, above, finalDi, opts) {
             }
         }
 
+        // What the line traces out between one change of direction and the next has to be
+        // singable as a shape, not just note by note: a run that sets off and turns round
+        // again having spanned a tritone or a seventh leaves the ear holding an interval
+        // nobody can pitch, even though every step of it was legal.
+        //
+        // Only where something in that run leapt, though. A tritone walked through a step at
+        // a time -- f g a b -- is filled in by its own passing notes and nobody hears an
+        // outline; it is the exposed one, with a leap somewhere in it, that Fux is warning
+        // about. Applying it to stepwise runs as well would forbid an ordinary scale figure,
+        // which in third species is most of what the line is made of.
+        const dir = Math.sign(cand.di - prev.di);
+        const priorDir = k >= 2 ? Math.sign(prev.di - chosen[k - 2].di) : dir;
+        const leapt = !cp_is_step(prev, cand);
+        if (k >= 2 && dir !== priorDir) {
+            if (runLeapt[k - 1] && cp_outlines_badly(chosen[runStart[k - 1]], prev)) return false;
+            runStart[k] = k - 1;      // the turn itself begins the next run
+            runLeapt[k] = leapt;
+        } else {
+            runStart[k] = k >= 2 ? runStart[k - 1] : 0;
+            runLeapt[k] = (k >= 2 ? runLeapt[k - 1] : false) || leapt;
+        }
+
         // motion between this attack and the previous one, against the cantus underneath
         const prevAttack = slotsFor[k - 1][0];
         const cfPrev = cantusAt(prevAttack.beat);
@@ -381,6 +413,11 @@ function cp_search(cantus, skeleton, above, finalDi, opts) {
     // of forty-odd quarters will pass through its top note more than once as a matter of
     // course, and Fux does not ask otherwise.
     function whole_line_ok() {
+        // the run still open when the line ends turns round at nothing, so it is only
+        // checkable here (see cp_outlines_badly() at its closing counterpart)
+        const lastK = chosen.length - 1;
+        if (lastK >= 1 && runLeapt[lastK]
+            && cp_outlines_badly(chosen[runStart[lastK]], chosen[lastK])) return false;
         if (!opts.singleClimax) return true;
         const dis = chosen.map((c) => c.di);
         const top = Math.max(...dis);
@@ -389,7 +426,19 @@ function cp_search(cantus, skeleton, above, finalDi, opts) {
     }
 
     function recurse(k) {
+        // Giving up has to be sticky. Returning false from the node that notices the clock
+        // only fails that one branch -- its parent moves straight on to the next candidate
+        // and the search grinds on regardless, which is exactly what it did: one node in a
+        // thousand refused while the other nine hundred and ninety-nine carried on, and a
+        // single search ran a full second past a budget it was checking all along.
+        if (aborted) return false;
         if (++nodes > 300000) return false; // a cantus this refuses is reported, not hidden
+        // sampled rather than checked every node -- performance.now() is not free, and a
+        // couple of hundred nodes either way costs nothing
+        if ((nodes & 255) === 0 && opts.deadline && performance.now() > opts.deadline) {
+            aborted = true;
+            return false;
+        }
         if (k === decisions) return settled_ok(k - 1) && whole_line_ok();
         for (const cand of candidates(k)) {
             if (!candidate_ok(k, cand)) continue;
@@ -405,9 +454,107 @@ function cp_search(cantus, skeleton, above, finalDi, opts) {
     return recurse(0) ? chosen.slice() : null;
 }
 
+// --- how good is it? ----------------------------------------------------------------
+//
+// Everything above is a prohibition: it decides whether a line is *allowed*. But Fux spends
+// as much of the treatise on what to prefer -- thirds and sixths over fifths and octaves,
+// contrary motion over similar, steps over leaps, a suspension that actually suspends -- and
+// those are proportions across a whole line, not verdicts on one note. A rule engine can
+// only refuse; it cannot lean. So the preferences live here instead, as a score, and
+// counterpoint_passage() searches out many legal lines and keeps the one that scores best.
+//
+// The weights are ordinary judgement, not Fux's arithmetic -- he gives no numbers. They were
+// set by generating a few hundred lines and comparing the measured proportions against what
+// his own examples do, which is the only honest way to calibrate something like this.
+function cp_score(line, cantus, skeleton, species) {
+    const slotsFor = [];
+    for (let d = 0; d < skeleton.decisions; d++) slotsFor.push([]);
+    skeleton.slots.forEach((s) => slotsFor[s.decision].push(s));
+    const at = (beat) => cantus[Math.floor(beat / 4)];
+
+    let perfect = 0, contrary = 0, similar = 0, steps = 0, moves = 0, wide = 0;
+    let suspensions = 0, dissonantSuspensions = 0;
+
+    line.forEach((note, k) => {
+        const attack = slotsFor[k][0];
+        const cf = at(attack.beat);
+        const gap = Math.abs(cp_midi(note) - cp_midi(cf));
+        if (cp_perfect(gap)) perfect++;
+        // a third to a tenth is where two voices sit and sound like two voices; wider than
+        // that and they stop belonging to each other, narrower and they are in each other's way
+        const apart = Math.abs(note.di - cf.di);
+        if (apart < 2 || apart > 9) wide++;
+
+        if (k === 0) return;
+        const prev = line[k - 1];
+        const cfPrev = at(slotsFor[k - 1][0].beat);
+        const dCp = Math.sign(cp_midi(note) - cp_midi(prev));
+        const dCf = Math.sign(cp_midi(cf) - cp_midi(cfPrev));
+        moves++;
+        if (cp_is_step(prev, note)) steps++;
+        if (dCp && dCf) { if (dCp === dCf) similar++; else contrary++; }
+
+        // a note held over a downbeat is the whole substance of fourth species -- but only
+        // if it actually grinds against the cantus. A consonant one is a syncopation and
+        // nothing more, legal and dull, and the search will happily fill a line with them.
+        if (slotsFor[k].length > 1) {
+            const over = slotsFor[k].find((s) => s !== attack && s.beat.mod(4) === 0);
+            if (over) {
+                suspensions++;
+                if (!cp_consonant(Math.abs(cp_midi(note) - cp_midi(at(over.beat))))) dissonantSuspensions++;
+            }
+        }
+    });
+
+    const n = line.length;
+    let score = 0;
+    score -= 30 * (perfect / n);            // thirds and sixths are the substance of the thing
+    score += 14 * (contrary / Math.max(1, moves));
+    score -= 6 * (similar / Math.max(1, moves));
+    score += 10 * (steps / Math.max(1, moves));
+    score -= 8 * (wide / n);
+    if (suspensions) score += 25 * (dissonantSuspensions / suspensions);
+
+    // one high point, and not squandered on the first or last note
+    const dis = line.map((c) => c.di);
+    const top = Math.max(...dis);
+    if (dis.filter((d) => d === top).length === 1) {
+        score += 4;
+        const where = dis.indexOf(top) / n;
+        if (where > 0.25 && where < 0.9) score += 3; // arrives having climbed, with somewhere to fall
+    }
+
+    // a line that keeps stepping away and back sounds like it is treading water
+    for (let k = 1; k < n - 1; k++) {
+        if (dis[k - 1] === dis[k + 1] && Math.abs(dis[k] - dis[k - 1]) === 1) score -= 1.5;
+    }
+
+    // florid writing should not repeat a bar's rhythm straight after itself
+    if (species === 5) {
+        const shape = [];
+        skeleton.slots.forEach((s) => {
+            const bar = Math.floor(s.beat / 4);
+            (shape[bar] = shape[bar] || []).push(s.dur);
+        });
+        for (let b = 1; b < shape.length; b++) {
+            if (shape[b] && shape[b - 1] && shape[b].join() === shape[b - 1].join()) score -= 2.5;
+        }
+    }
+    return score;
+}
+
 // --- building the passage -----------------------------------------------------------
 
 const counterpoint_settings = { species: 1, above: true };
+
+// How long counterpoint_passage() may spend looking for a *better* line once it already has
+// a usable one -- a search costs well under a millisecond, so this buys dozens of candidates
+// to choose between. The second budget caps the whole hunt, including the attempts that find
+// nothing at all: below the Lydian and Ionian canti a fourth- or fifth-species line can take
+// a great many tries before the first one lands, and without a ceiling on that the search
+// would run for as long as it liked and NEW would feel like it had stuck.
+const CP_POLISH_BUDGET_MS = 40;
+const CP_TOTAL_BUDGET_MS = 160;
 
 function counterpoint_passage() {
     const entry = random_element(FUX_CANTUS_FIRMI);
@@ -423,7 +570,6 @@ function counterpoint_passage() {
         ? [cfFinal.di + 7, cfFinal.di + 14]
         : [cfFinal.di - 7, cfFinal.di - 14];
 
-    let line = null, skeleton = null;
     // A rejected attempt means this particular shuffle painted itself into a corner (or, in
     // fifth species, that the rhythm drawn for the bar left nothing legal to put in it),
     // not that the exercise is impossible -- so retry before giving up. Each pass gives up
@@ -433,15 +579,29 @@ function counterpoint_passage() {
     // never need that last concession at all; the two that do (below the Lydian and Ionian
     // canti, where the chain runs out of consonances to resolve onto) should still come out
     // with a bar or two restruck rather than a line that has stopped being fourth species.
-    // A search costs well under a millisecond, so trying thirty of them is free.
-    for (let attempt = 0; attempt < 30 && !line; attempt++) {
+    //
+    // Attempts don't stop at the first line that works, either. Legality is a low bar --
+    // plenty of lines clear it and still sound like nothing -- so the search keeps going for
+    // as long as its budget allows and hands back whichever candidate cp_score() likes best.
+    // That is where the difference between "obeys Fux" and "sounds like Fux" actually lives.
+    let line = null, skeleton = null, best = -Infinity;
+    const hardStop = performance.now() + CP_TOTAL_BUDGET_MS;
+    let polishUntil = Infinity; // starts counting only once there is something to improve on
+    for (let attempt = 0; attempt < 400; attempt++) {
         const breakChance = species === 4 && attempt >= 6 ? Math.min(0.3, 0.04 * (attempt - 5)) : 0;
-        skeleton = cp_skeleton(species, bars, breakChance);
+        const trySkeleton = cp_skeleton(species, bars, breakChance);
         for (const finalDi of finals) {
-            line = cp_search(cantus, skeleton, above, finalDi,
-                { singleClimax: species <= 2 && attempt < 8 });
-            if (line) break;
+            const found = cp_search(cantus, trySkeleton, above, finalDi,
+                { singleClimax: species <= 2 && attempt < 8, deadline: hardStop });
+            if (!found) continue;
+            const score = cp_score(found, cantus, trySkeleton, species);
+            if (score > best) { best = score; line = found; skeleton = trySkeleton; }
+            if (polishUntil === Infinity) polishUntil = performance.now() + CP_POLISH_BUDGET_MS;
+            break;
         }
+        const now = performance.now();
+        if (line && now > polishUntil) break; // found one, and had a fair go at bettering it
+        if (now > hardStop) break;            // taking too long with or without one
     }
     if (!line) return null;
 
