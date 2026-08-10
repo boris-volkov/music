@@ -21,4 +21,4 @@ function init_chord(){
     init_quiz(random_chord, chord_callback)
 }
 
-add_game_button('Chords', init_chord, 'menu_ear', 'ear');
+add_game_button('Chords', init_chord, 'menu_theory', 'theory');
