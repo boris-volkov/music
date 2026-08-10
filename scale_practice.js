@@ -67,6 +67,14 @@ function scale_practice_passage() {
     const tonic = tonic_from_note_name(root.name);
     const preferFlats = root.name.includes('♭');
     const steps = chosenScale.notes;
+    // The name printed above the staff has to come from whichever spelling
+    // spell_scale_pitch() below is actually about to draw, not from the raw button name --
+    // for 7-note scales that's the (possibly key-respelled) tonic, e.g. G♯ minor is written
+    // in A♭ because nobody notates nine sharps, and used to say "G♯ minor" up top while the
+    // staff below it read A♭. Scales with some other note count never go through that
+    // respelling (see spell_scale_pitch's comment), so root.name is still the right name
+    // for those -- same condition spell_scale_pitch branches on, so the two can't drift.
+    const displayRoot = steps.length === 7 ? tonic.display : root.name;
     const degrees = scale_degrees(steps.length, scale_practice_settings.octaves);
     // absolute octaves (right hand around 4, left around 3, a real octave apart) when
     // there's only one octave to climb -- dropped a further octave once there's more than
@@ -144,7 +152,7 @@ function scale_practice_passage() {
     const hands = two_handed() ? 'both hands' : left_only() ? 'left hand' : 'right hand';
     const octaveLabel = scale_practice_settings.octaves === 1 ? '1 octave' : `${scale_practice_settings.octaves} octaves`;
     const attribution = {
-        title: `${root.name} ${chosenScale.name}`,
+        title: `${displayRoot} ${chosenScale.name}`,
         detail: `${octaveLabel} · ${hands}`,
     };
     // no key signature -- partimento can assume every root is major and derive one, but
